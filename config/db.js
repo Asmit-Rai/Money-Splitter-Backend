@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
-const mongoURI = "mongodb+srv://d-transaction-app:mongodb@cluster0.cgkt3.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+const mongoURI =
+  "mongodb+srv://d-transaction-app:mongodb@cluster0.cgkt3.mongodb.net/transaction-app?retryWrites=true&w=majority&appName=Cluster0";
 
 const connectToMongoDB = async () => {
   try {
