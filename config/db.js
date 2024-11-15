@@ -1,9 +1,7 @@
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
-// Use environment variables for sensitive information
-require('dotenv').config();
-
-const uri = `mongodb+srv://d-transaction-app:${process.env.DB_PASSWORD}@cluster0.cgkt3.mongodb.net/?retryWrites=true&w=majority`;
+// Hardcoded MongoDB connection string (replace with your actual credentials)
+const uri = "mongodb+srv://d-transaction-app:mongodb@cluster0.cgkt3.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -14,22 +12,23 @@ const client = new MongoClient(uri, {
   },
 });
 
-// Connect to the MongoDB server and export the client for use in your application
+// Function to connect to MongoDB
 const connectToMongoDB = async () => {
   try {
-    // Connect the client to the server
+    // Connect to MongoDB
     await client.connect();
+    console.log("MongoDB connected successfully!");
 
-    // Ping the database to confirm a successful connection
-    await client.db().command({ ping: 1 });
-    console.log("Connected successfully to MongoDB!");
+    // Optional: Ping the database
+    await client.db("money_splitter").command({ ping: 1 });
+    console.log("Pinged the database successfully.");
   } catch (error) {
-    console.error("MongoDB connection error:", error.message);
-    process.exit(1); // Exit the process if unable to connect
+    console.error("Failed to connect to MongoDB:", error.message);
+    process.exit(1); // Exit process on failure
   }
 };
 
-// Call the function to initiate the connection
+// Call the connection function
 connectToMongoDB();
 
 module.exports = client;
