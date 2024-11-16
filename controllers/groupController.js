@@ -1,4 +1,5 @@
 const Group = require('../models/Group');
+const mongoose = require('mongoose');
 
 // Add a new group
 exports.addGroup = async (req, res) => {
