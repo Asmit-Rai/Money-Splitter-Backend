@@ -1,26 +1,22 @@
 const User = require('../models/User');
-const mongoose = require('mongoose');
 
+exports.addUser = async (req, res) => {
+    const { email, password } = req.body;
 
-exports.addUser = async(req , res) =>
-{
-    const {email , password} = req.body.
-
-    if(!email , !password)
-    {
-        console.log('Please Enter the Email and Password');
+    // Validate inputs
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required.' });
     }
 
-    try{
-        const newUser = new User({
-            email,
-            password
-        });
+    try {
+        // Create a new user
+        const newUser = new User({ email, password });
+        const savedUser = await newUser.save();
 
-        const saveUser = await newUser.save();
+        // Return success response
+        return res.status(201).json({ message: 'User created successfully', user: savedUser });
+    } catch (error) {
+        console.error('Error in Creating User:', error.message);
+        return res.status(500).json({ error: 'Failed to create user', details: error.message });
     }
-    catch(error)
-    {
-        console.error("Error in Creating User" , error.message)
-    }
-}
+};
