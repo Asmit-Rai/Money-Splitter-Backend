@@ -2,9 +2,6 @@ const Group = require('../models/Group');
 const mongoose = require('mongoose');
 const User = require('../models/User')
 
-const Group = require('../models/Group');
-const User = require('../models/User');
-
 exports.addGroup = async (req, res) => {
   const { email, groupName, participants } = req.body;
 
