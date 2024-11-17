@@ -3,6 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const mongoose = require('./config/db'); 
 const groupRoutes = require('./routes/groupRoutes'); 
+const userRoutes = require('./routes/userRoutes'); 
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -13,6 +14,29 @@ app.use(bodyParser.json());
 
 // Routes
 app.use('/api/groups', groupRoutes);
+app.use('/api/users', userRoutes);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

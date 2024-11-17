@@ -1,7 +1,6 @@
 const Group = require('../models/Group');
 const mongoose = require('mongoose');
 
-// Add a new group
 exports.addGroup = async (req, res) => {
   const { groupName, participants } = req.body;
 
@@ -17,12 +16,8 @@ exports.addGroup = async (req, res) => {
       participants: participants.map((p) => ({ name: p.name, email: p.email })),
     });
     const savedGroup = await newGroup.save();
-    res.status(200).json({ group: savedGroup });
   } catch (error) {
     console.error('Error saving group:', error.message);
-    res
-      .status(500)
-      .json({ message: 'Error creating group', error: error.message });
   }
 };
 
@@ -59,4 +54,4 @@ exports.deleteGroup = async (req, res) => {
     console.error('Error deleting group:', error.message);
     res.status(500).json({ message: 'Error deleting group', error: error.message });
   }
-};
+};0
