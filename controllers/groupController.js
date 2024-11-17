@@ -2,6 +2,7 @@ const Group = require('../models/Group');
 const mongoose = require('mongoose');
 const User = require('../models/User')
 
+
 exports.addGroup = async (req, res) => {
   const { email, groupName, participants } = req.body;
 
@@ -41,21 +42,22 @@ exports.getData = async (req, res) => {
   const { email } = req.query;
 
   if (!email) {
-    return res.status(400).json({ message: 'Email is required to fetch groups.' });
+    return res.status(400).json({ message: "Email is required to fetch groups." });
   }
 
   try {
-    const user = await User.findOne({ email }).populate('groups'); // Populate groups
+    const user = await User.findOne({ email }).populate("groups");
     if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
+      return res.status(404).json({ message: "User not found." });
     }
 
-    return res.status(200).json(user.groups);
+    res.status(200).json(user.groups);
   } catch (error) {
-    console.error('Error fetching groups:', error.message);
-    return res.status(500).json({ message: 'Error fetching groups', error: error.message });
+    console.error("Error fetching groups:", error.message);
+    res.status(500).json({ message: "Error fetching groups", error: error.message });
   }
 };
+
 
 
 // Delete a group by ID
@@ -78,4 +80,4 @@ exports.deleteGroup = async (req, res) => {
     console.error('Error deleting group:', error.message);
     res.status(500).json({ message: 'Error deleting group', error: error.message });
   }
-};0
+};
