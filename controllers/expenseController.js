@@ -18,7 +18,8 @@ exports.addExpense = async (req, res) => {
         }));
         
         if (!updatedParticipants.find(p => p.user.toString() === payer.toString())) {
-        
+            return res.status(400).json({ message: 'Payer must be one of the participants.' });
+        }
 
         // Create a new expense
         const newExpense = new Expense({
