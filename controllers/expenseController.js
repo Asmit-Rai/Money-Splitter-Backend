@@ -11,7 +11,7 @@ exports.addExpense = async (req, res) => {
         console.log('Request Body:', req.body);
 
         // Validate required fields
-        if (!expenseName || !amount || !payer || !participants ) {
+        if (!expenseName || !amount || !payer || !participants || !groupId) {
             return res.status(400).json({ message: 'All fields are required.' });
         }
 
@@ -25,12 +25,6 @@ exports.addExpense = async (req, res) => {
             return res.status(400).json({ message: 'Participants must be a non-empty array.' });
         }
 
-        // Find the payer
-        const payerUser = await User.findOne({ name: payer });
-        if (!payerUser) {
-            return res.status(404).json({ message: 'Payer not found.' });
-        }
-
         // Map participants to user IDs
         const updatedParticipants = await Promise.all(
             participants.map(async (participantName) => {
@@ -40,13 +34,13 @@ exports.addExpense = async (req, res) => {
                 }
                 return {
                     user: participantUser._id,
-                    hasPaid: participantUser._id.toString() === payerUser._id.toString(),
+                    hasPaid: participantUser.name === payer,
                 };
             })
         );
 
         // Ensure the payer is included in the participants
-        if (!updatedParticipants.some((p) => p.user.toString() === payerUser._id.toString())) {
+        if (!updatedParticipants.some((p) => p.user.toString() === payer)) {
             return res.status(400).json({ message: 'Payer must be one of the participants.' });
         }
 
@@ -60,7 +54,7 @@ exports.addExpense = async (req, res) => {
         const newExpense = new Expense({
             expenseName,
             amount,
-            payer: payerUser._id,
+            payer, // Directly use the payer's name
             participants: updatedParticipants,
             group: groupId,
         });
