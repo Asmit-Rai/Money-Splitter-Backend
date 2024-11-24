@@ -5,10 +5,18 @@ const expenseSchema = new mongoose.Schema({
     payer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     participants: [
         {
-            user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-            hasPaid: { type: Boolean, default: false } 
+            user: { 
+                type: mongoose.Schema.Types.ObjectId, 
+                ref: 'User', 
+                required: [true, "Participant must have a user ID"] 
+            },
+            hasPaid: { 
+                type: Boolean, 
+                default: false 
+            }
         }
     ],
+    
     amount: { type: Number, required: true, validate: Number.isFinite },
     group: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
     createdAt: { type: Date, default: Date.now }

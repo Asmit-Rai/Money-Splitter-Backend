@@ -9,7 +9,9 @@ exports.addExpense = async (req, res) => {
 
         // Validate required fields
         if (!expenseName || !amount || !payer || !participants || !groupId) {
-            return res.status(400).json({ message: 'All fields are required: expenseName, amount, payer, participants, groupId.' });
+            return res.status(400).json({ 
+                message: 'All fields are required: expenseName, amount, payer, participants, groupId.' 
+            });
         }
 
         // Validate amount
@@ -23,12 +25,18 @@ exports.addExpense = async (req, res) => {
             return res.status(404).json({ message: `Group with ID "${groupId}" not found.` });
         }
 
+        // Format participants array
+        const formattedParticipants = participants.map((userId) => ({
+            user: userId, // Use userId as the ObjectId
+            hasPaid: false, // Default to false
+        }));
+
         // Create the expense
         const newExpense = new Expense({
             expenseName,
             amount,
-            payer:payer, // Directly use payer ObjectId from the request
-            participants, // Use participants array directly from the request
+            payer, // Use payer ObjectId from the request
+            participants: formattedParticipants, // Use formatted participants array
             group: groupId, // Use groupId directly
         });
 
@@ -41,6 +49,9 @@ exports.addExpense = async (req, res) => {
         });
     } catch (error) {
         console.error('Error adding expense:', error.message);
-        res.status(500).json({ message: 'Server error. Please try again later.', error: error.message });
+        res.status(500).json({ 
+            message: 'Server error. Please try again later.', 
+            error: error.message 
+        });
     }
 };
