@@ -25,12 +25,24 @@ exports.addExpense = async (req, res) => {
             return res.status(400).json({ message: 'Participants are required.' });
         }
 
-        const updatedParticipants = participants.map(participant => ({
-            user: participant,
-            hasPaid: participant.toString() === payer.toString()
+        // Find the payer's user ID based on the payer's name
+        const payerUser = await User.findOne({ name: payer });
+        if (!payerUser) {
+            return res.status(400).json({ message: 'Payer not found.' });
+        }
+
+        const updatedParticipants = await Promise.all(participants.map(async (participantName) => {
+            const participantUser = await User.findOne({ name: participantName });
+            if (!participantUser) {
+                throw new Error(`Participant ${participantName} not found.`);
+            }
+            return {
+                user: participantUser._id,
+                hasPaid: participantUser._id.toString() === payerUser._id.toString()
+            };
         }));
 
-        if (!updatedParticipants.find(p => p.user.toString() === payer.toString())) {
+        if (!updatedParticipants.find(p => p.user.toString() === payerUser._id.toString())) {
             return res.status(400).json({ message: 'Payer must be one of the participants.' });
         }
 
@@ -38,7 +50,7 @@ exports.addExpense = async (req, res) => {
         const newExpense = new Expense({
             expenseName,
             amount,
-            payer,
+            payer: payerUser._id,
             participants: updatedParticipants,
             group: groupId
         });
