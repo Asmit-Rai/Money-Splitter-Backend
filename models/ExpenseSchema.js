@@ -9,7 +9,7 @@ const expenseSchema = new mongoose.Schema({
             hasPaid: { type: Boolean, default: false } 
         }
     ],
-    amount: { type: Number, required: true },
+    amount: { type: Number, required: true, validate: Number.isFinite },
     group: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
     createdAt: { type: Date, default: Date.now }
 });
