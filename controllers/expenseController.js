@@ -1,3 +1,9 @@
+const Group = require('../models/Group');
+const mongoose = require('mongoose');
+const User = require('../models/User')
+const Expense = require('../models/Expense')
+
+
 exports.addExpense = async (req, res) => {
     try {
       const { expenseName, amount, payer, participants, groupId } = req.body;
