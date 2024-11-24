@@ -5,7 +5,7 @@ const Expense = require('../models/ExpenseSchema');
 
 exports.addExpense = async (req, res) => {
     try {
-        const { expenseName, amount, payer, participants, groupId } = req.body;
+        const { expenseName, amount, payer, participants} = req.body;
 
         // Debugging request data
         console.log('Request Body:', req.body);
@@ -31,16 +31,6 @@ exports.addExpense = async (req, res) => {
             hasPaid: participantName === payer,
         }));
 
-        // Ensure the payer is included in the participants
-        if (!updatedParticipants.some((p) => p.user === payer)) {
-            return res.status(400).json({ message: 'Payer must be one of the participants.' });
-        }
-
-        // Check if group exists
-        const group = await Group.findById(groupId);
-        if (!group) {
-            return res.status(404).json({ message: 'Group not found.' });
-        }
 
         // Create a new expense
         const newExpense = new Expense({
@@ -48,7 +38,6 @@ exports.addExpense = async (req, res) => {
             amount,
             payer, // Directly use the payer's name
             participants: updatedParticipants,
-            group: groupId,
         });
 
         // Save the expense to the database
