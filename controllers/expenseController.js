@@ -7,9 +7,9 @@ exports.addExpense = async (req, res) => {
     try {
         const { expenseName, amount, payer, participants, groupId } = req.body;
 
-        if (!expenseName || !amount || !payer || !participants || !groupId) {
-            return res.status(400).json({ message: 'All fields are required.' });
-        }
+        // if (!expenseName || !amount || !payer || !participants || !groupId) {
+        //     return res.status(400).json({ message: 'All fields are required.' });
+        // }
         
      
 
