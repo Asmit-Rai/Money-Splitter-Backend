@@ -8,9 +8,9 @@ exports.addExpense = async (req, res) => {
         const { expenseName, amount, payer, participants, groupId } = req.body;
 
         // Validate required fields
-        if (!expenseName || !amount || !payer || !participants || !groupId) {
-            return res.status(400).json({ message: 'All fields are required.' });
-        }
+        // if (!expenseName || !amount || !payer || !participants || !groupId) {
+        //     return res.status(400).json({ message: 'All fields are required.' });
+        // }
 
         const updatedParticipants = participants.map(participant => ({
             user: participant,

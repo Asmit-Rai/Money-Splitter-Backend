@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const mongoose = require('./config/db'); 
 const groupRoutes = require('./routes/groupRoutes'); 
 const userRoutes = require('./routes/userRoutes'); 
-const expenseRoutes = require('./routes/expenseRoutes'); 
+const expenseRoutes = require('./routes/expenseRoutes')
 
 const app = express();
 const port = process.env.PORT || 5000;
