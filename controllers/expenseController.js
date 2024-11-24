@@ -3,7 +3,7 @@ const Group = require('../models/Group');
 
 exports.addExpense = async (req, res) => {
     try {
-        const { expenseName, amount, payer, participants, groupId } = req.body;
+        const { expenseName, amount, payer, participants, groupId  } = req.body;
 
         console.log('Received Request Body:', req.body); // Log the request body for debugging
 
