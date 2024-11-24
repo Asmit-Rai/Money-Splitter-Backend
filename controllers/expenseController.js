@@ -3,7 +3,7 @@ const Group = require('../models/Group');
 
 exports.addExpense = async (req, res) => {
     try {
-        const { expenseName, amount, payer, participants, groupId  } = req.body;
+        const { expenseName, amount, payer, participants, groupId } = req.body;
 
         console.log('Received Request Body:', req.body); // Log the request body for debugging
 
@@ -27,7 +27,7 @@ exports.addExpense = async (req, res) => {
         const newExpense = new Expense({
             expenseName,
             amount,
-            payer, // Directly use payer ObjectId from the request
+            payer:payer, // Directly use payer ObjectId from the request
             participants, // Use participants array directly from the request
             group: groupId, // Use groupId directly
         });
