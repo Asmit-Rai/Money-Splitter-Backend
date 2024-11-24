@@ -4,7 +4,5 @@ const router = express.Router();
 const expenseController = require('../controllers/expenseController');
 
 
-router.post('/add-expense', expenseController.addGroup);
-
-
+router.post('/add-expense', expenseController.addExpense);
 module.exports = router;

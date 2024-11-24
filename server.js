@@ -16,12 +16,7 @@ app.use(bodyParser.json());
 // Routes
 app.use('/api/groups', groupRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/expense', expenseRoutes);
-
-
-
-
-
+app.use('/api/expenses', expenseRoutes);
 
 
 

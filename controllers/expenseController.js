@@ -12,16 +12,13 @@ exports.addExpense = async (req, res) => {
             return res.status(400).json({ message: 'All fields are required.' });
         }
 
-        // Ensure payer is part of participants and has paid
         const updatedParticipants = participants.map(participant => ({
             user: participant,
-            hasPaid: participant === payer // Mark the payer as having paid
+            hasPaid: participant.toString() === payer.toString()
         }));
-
-        // Check if payer is included in participants
-        if (!updatedParticipants.find(p => p.user === payer)) {
-            return res.status(400).json({ message: 'Payer must be included in participants.' });
-        }
+        
+        if (!updatedParticipants.find(p => p.user.toString() === payer.toString())) {
+        
 
         // Create a new expense
         const newExpense = new Expense({
