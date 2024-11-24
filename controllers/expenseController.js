@@ -11,7 +11,7 @@ exports.addExpense = async (req, res) => {
         console.log('Request Body:', req.body);
 
         // Validate required fields
-        if (!expenseName || !amount || !payer || !participants || !groupId) {
+        if (!expenseName || !amount || !payer || !participants ) {
             return res.status(400).json({ message: 'All fields are required.' });
         }
 
