@@ -1,5 +1,6 @@
 const Expense = require('../models/Expense');
 const Group = require('../models/Group');
+require('dotenv').config();
 
 exports.addExpense = async (req, res) => {
     try {
@@ -63,3 +64,56 @@ exports.addExpense = async (req, res) => {
         });
     }
 };
+
+
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+exports.confirmPaymentAndAddExpense = async (req, res) => {
+    try {
+        const { expenseName, amount, payer, participants, groupId, paymentIntentId } = req.body;
+
+        // Validate required fields
+        if (!expenseName || !amount || !payer || !participants || !groupId || !paymentIntentId) {
+            return res.status(400).json({
+                message: 'All fields are required: expenseName, amount, payer, participants, groupId, paymentIntentId.',
+            });
+        }
+
+        // Verify the payment intent with Stripe
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+        if (paymentIntent.status !== 'succeeded') {
+            return res.status(400).json({ message: 'Payment not successful. Expense will not be added.' });
+        }
+
+        // Format participants array
+        const formattedParticipants = participants.map((userId) => ({
+            user: userId,
+            hasPaid: false,
+        }));
+
+        // Create the expense
+        const newExpense = new Expense({
+            expenseName,
+            amount,
+            payer,
+            participants: formattedParticipants,
+            group: groupId,
+        });
+
+        // Save the expense
+        const savedExpense = await newExpense.save();
+
+        res.status(201).json({
+            message: 'Payment verified, and expense added successfully.',
+            expense: savedExpense,
+        });
+    } catch (error) {
+        console.error('Error in payment confirmation and expense creation:', error.message);
+        res.status(500).json({
+            message: 'Server error. Please try again later.',
+            error: error.message,
+        });
+    }
+};
+
