@@ -1,17 +1,16 @@
 const User = require('../models/User');
 
-
 exports.addUser = async (req, res) => {
-    const { name, email, password } = req.body; // Added name
+    const { email, password } = req.body;
 
     // Validate inputs
-    if (!name || !email || !password) { // Validate name
-        return res.status(400).json({ error: 'Name, email, and password are required.' });
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required.' });
     }
 
     try {
         // Create a new user
-        const newUser = new User({ name, email, password }); // Include name
+        const newUser = new User({ email, password });
         const savedUser = await newUser.save();
 
         // Return success response
