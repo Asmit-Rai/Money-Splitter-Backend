@@ -81,12 +81,14 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
         }
 
         // Validate the payment intent with Stripe
-        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+       // Server-side code (confirmPaymentAndAddExpense function)
+const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
-        if (!paymentIntent || paymentIntent.status !== 'succeeded') {
-            console.error('Invalid or incomplete payment intent:', paymentIntent);
-            return res.status(400).json({ message: 'Payment not successful. Expense will not be added.' });
-        }
+if (!paymentIntent || paymentIntent.status !== 'succeeded') {
+    console.error('Invalid or incomplete payment intent:', paymentIntent);
+    return res.status(400).json({ message: 'Payment not successful. Expense will not be added.' });
+}
+
 
         console.log('PaymentIntent verified:', paymentIntent);
 
