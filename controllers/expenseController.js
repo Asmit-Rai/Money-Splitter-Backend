@@ -132,3 +132,24 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
 
 
 
+  exports.getData = async (req, res) => {
+    try {
+      // Fetch all expenses from the database
+      const expenses = await Expense.find();
+      
+      // Respond with the data
+      res.status(200).json({
+        success: true,
+        expenses,
+      });
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch data',
+      });
+    }
+  };
+  
+
+
