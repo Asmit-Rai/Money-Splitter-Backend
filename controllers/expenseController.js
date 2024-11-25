@@ -153,23 +153,36 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
 
 
 
-exports.getExpenseDetail = async (req, res) => {
+  exports.getExpenseDetail = async (req, res) => {
     const { expenseId } = req.params;
+
     try {
+        // Retrieve the PaymentIntent from Stripe
         const paymentIntent = await stripe.paymentIntents.retrieve(expenseId);
-        const charges = paymentIntent.charges.data;
-        const paymentStatus = charges.map(charge => ({
-            participant: charge.billing_details.name,
+
+        if (!paymentIntent) {
+            return res.status(404).json({ error: 'PaymentIntent not found' });
+        }
+
+        const charges = paymentIntent.charges.data || [];
+        const paymentStatus = charges.map((charge) => ({
+            participant: charge.billing_details.name || 'Unknown',
             status: charge.status,
-            amountPaid: charge.amount / 100 // Convert from smallest currency unit
+            amountPaid: charge.amount / 100, // Convert from smallest currency unit
         }));
 
-        // Assuming split details are stored in metadata
-        const splitDetails = paymentIntent.metadata.splitDetails ? JSON.parse(paymentIntent.metadata.splitDetails) : [];
+        // Extract split details from metadata if available
+        const splitDetails = paymentIntent.metadata?.splitDetails
+            ? JSON.parse(paymentIntent.metadata.splitDetails)
+            : [];
 
         res.json({ paymentStatus, splitDetails });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error fetching expense details:', error.message);
+        res.status(500).json({
+            error: 'Failed to retrieve expense details',
+            details: error.message,
+        });
     }
 };
 
