@@ -72,6 +72,8 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
     try {
         const { expenseName, amount, payer, participants, groupId, paymentIntentId } = req.body;
 
+        console.log('Received Request Body:', req.body); // Debugging log
+
         // Validate required fields
         if (!expenseName || !amount || !payer || !participants || !groupId || !paymentIntentId) {
             return res.status(400).json({
@@ -82,15 +84,20 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
         // Verify the payment intent with Stripe
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
-        if (paymentIntent.status !== 'succeeded') {
+        if (!paymentIntent || paymentIntent.status !== 'succeeded') {
+            console.error('Payment not successful or invalid payment intent:', paymentIntent); // Debugging log
             return res.status(400).json({ message: 'Payment not successful. Expense will not be added.' });
         }
+
+        console.log('Payment verified:', paymentIntent.id); // Debugging log
 
         // Format participants array
         const formattedParticipants = participants.map((userId) => ({
             user: userId,
             hasPaid: false,
         }));
+
+        console.log('Formatted Participants:', formattedParticipants); // Debugging log
 
         // Create the expense
         const newExpense = new Expense({
@@ -103,6 +110,8 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
 
         // Save the expense
         const savedExpense = await newExpense.save();
+
+        console.log('Expense saved successfully:', savedExpense); // Debugging log
 
         res.status(201).json({
             message: 'Payment verified, and expense added successfully.',
