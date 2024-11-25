@@ -70,36 +70,37 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 exports.confirmPaymentAndAddExpense = async (req, res) => {
     try {
+        console.log('Received request:', req.body);
+
         const { expenseName, amount, payer, participants, groupId, paymentIntentId } = req.body;
 
-        console.log('Received Request Body:', req.body); // Debugging log
-
-        // Validate required fields
         if (!expenseName || !amount || !payer || !participants || !groupId || !paymentIntentId) {
             return res.status(400).json({
                 message: 'All fields are required: expenseName, amount, payer, participants, groupId, paymentIntentId.',
             });
         }
 
-        // Verify the payment intent with Stripe
+        console.log('Validating payment intent:', paymentIntentId);
+
+        // Verify payment intent
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
         if (!paymentIntent || paymentIntent.status !== 'succeeded') {
-            console.error('Payment not successful or invalid payment intent:', paymentIntent); // Debugging log
+            console.error('Payment validation failed:', paymentIntent); // Debugging log
             return res.status(400).json({ message: 'Payment not successful. Expense will not be added.' });
         }
 
-        console.log('Payment verified:', paymentIntent.id); // Debugging log
+        console.log('Payment successful:', paymentIntent);
 
-        // Format participants array
+        // Format participants
         const formattedParticipants = participants.map((userId) => ({
             user: userId,
             hasPaid: false,
         }));
 
-        console.log('Formatted Participants:', formattedParticipants); // Debugging log
+        console.log('Formatted participants:', formattedParticipants);
 
-        // Create the expense
+        // Create and save the expense
         const newExpense = new Expense({
             expenseName,
             amount,
@@ -108,21 +109,23 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
             group: groupId,
         });
 
-        // Save the expense
         const savedExpense = await newExpense.save();
 
-        console.log('Expense saved successfully:', savedExpense); // Debugging log
+        console.log('Expense saved successfully:', savedExpense);
 
         res.status(201).json({
             message: 'Payment verified, and expense added successfully.',
             expense: savedExpense,
         });
     } catch (error) {
-        console.error('Error in payment confirmation and expense creation:', error.message);
+        console.error('Error in payment confirmation and expense creation:', error);
+
+        // Respond with a JSON error
         res.status(500).json({
             message: 'Server error. Please try again later.',
             error: error.message,
         });
     }
 };
+
 
