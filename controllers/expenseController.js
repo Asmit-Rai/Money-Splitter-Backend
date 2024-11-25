@@ -66,60 +66,69 @@ exports.addExpense = async (req, res) => {
 };
 
 
+// Server-side code (e.g., expensesController.js)
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 exports.confirmPaymentAndAddExpense = async (req, res) => {
     try {
-        const { expenseName, amount, payer, participants, groupId, paymentIntentId } = req.body;
-
-        console.log('Received request:', req.body);
-
-        if (!paymentIntentId) {
-            return res.status(400).json({
-                message: 'PaymentIntentId is required for verification.',
-            });
-        }
-
-        // Validate the payment intent with Stripe
-       // Server-side code (confirmPaymentAndAddExpense function)
-const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-
-if (!paymentIntent || paymentIntent.status !== 'succeeded') {
-    console.error('Invalid or incomplete payment intent:', paymentIntent);
-    return res.status(400).json({ message: 'Payment not successful. Expense will not be added.' });
-}
-
-
-        console.log('PaymentIntent verified:', paymentIntent);
-
-        const formattedParticipants = participants.map((userId) => ({
-            user: userId,
-            hasPaid: false,
-        }));
-
-        const newExpense = new Expense({
-            expenseName,
-            amount,
-            payer,
-            participants: formattedParticipants,
-            group: groupId,
+      const {
+        expenseName,
+        amount,
+        payer,
+        participants,
+        groupId,
+        paymentIntentId,
+      } = req.body;
+  
+      console.log('Received request:', req.body);
+  
+      if (!paymentIntentId) {
+        return res.status(400).json({
+          message: 'PaymentIntentId is required for verification.',
         });
-
-        const savedExpense = await newExpense.save();
-
-        res.status(201).json({
-            message: 'Payment verified, and expense added successfully.',
-            expense: savedExpense,
+      }
+  
+      // Retrieve the PaymentIntent using the ID
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  
+      if (!paymentIntent || paymentIntent.status !== 'succeeded') {
+        console.error('Invalid or incomplete payment intent:', paymentIntent);
+        return res.status(400).json({
+          message: 'Payment not successful. Expense will not be added.',
         });
+      }
+  
+      console.log('PaymentIntent verified:', paymentIntent);
+  
+      // Proceed to add the expense to your database
+      const formattedParticipants = participants.map((userId) => ({
+        user: userId,
+        hasPaid: false,
+      }));
+  
+      const newExpense = new Expense({
+        expenseName,
+        amount,
+        payer,
+        participants: formattedParticipants,
+        group: groupId,
+      });
+  
+      const savedExpense = await newExpense.save();
+  
+      res.status(201).json({
+        message: 'Payment verified, and expense added successfully.',
+        expense: savedExpense,
+      });
     } catch (error) {
-        console.error('Error in payment confirmation and expense creation:', error);
-
-        res.status(500).json({
-            message: 'Server error. Please try again later.',
-            error: error.message,
-        });
+      console.error('Error in payment confirmation and expense creation:', error);
+  
+      res.status(500).json({
+        message: 'Server error. Please try again later.',
+        error: error.message,
+      });
     }
-};
+  };
 
 
 
