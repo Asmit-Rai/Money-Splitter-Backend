@@ -17,6 +17,23 @@ const expenseSchema = new mongoose.Schema({
             hasPaid: { 
                 type: Boolean, 
                 default: false 
+            },
+            amountPaid: { 
+                type: Number, 
+                default: 0 
+            }
+        }
+    ],
+    splitDetails: [
+        {
+            participant: { 
+                type: mongoose.Schema.Types.ObjectId, 
+                ref: 'User', 
+                required: true 
+            },
+            owedAmount: { 
+                type: Number, 
+                required: true 
             }
         }
     ],
@@ -37,5 +54,3 @@ const expenseSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('Expense', expenseSchema);
-
-
