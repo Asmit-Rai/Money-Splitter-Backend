@@ -81,3 +81,25 @@ exports.deleteGroup = async (req, res) => {
     res.status(500).json({ message: 'Error deleting group', error: error.message });
   }
 };
+
+exports.getId =  async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.id)
+      .populate({
+        path: 'expenses',
+        populate: {
+          path: 'payer', // Populate payer details
+          select: 'name email', // Select only required fields
+        },
+      });
+
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+
+    res.json(group);
+  } catch (error) {
+    console.error('Error fetching group:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
