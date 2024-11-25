@@ -5,12 +5,20 @@ exports.addExpense = async (req, res) => {
     try {
         const { expenseName, amount, payer, participants, groupId } = req.body;
 
-        console.log('Received Request Body:', req.body); // Log the request body for debugging
+        // Log incoming data for debugging
+        console.log('Received Request Body:', req.body);
 
         // Validate required fields
         if (!expenseName || !amount || !payer || !participants || !groupId) {
-            return res.status(400).json({ 
-                message: 'All fields are required: expenseName, amount, payer, participants, groupId.' 
+            return res.status(400).json({
+                message: 'All fields are required: expenseName, amount, payer, participants, groupId.'
+            });
+        }
+
+        // Validate participants as an array
+        if (!Array.isArray(participants) || participants.length === 0) {
+            return res.status(400).json({
+                message: 'Participants should be a non-empty array of user IDs.'
             });
         }
 
@@ -20,18 +28,18 @@ exports.addExpense = async (req, res) => {
         }
 
         // Validate group existence
-        const groupExists = await Group.exists({ _id: groupId });
+        const groupExists = await Group.findById(groupId);
         if (!groupExists) {
             return res.status(404).json({ message: `Group with ID "${groupId}" not found.` });
         }
 
-        // Format participants array
-        const formattedParticipants = participants.map((userId) => ({
-            user: userId, // Use userId as the ObjectId
-            hasPaid: false, // Default to false
+        // Format participants
+        const formattedParticipants = participants.map(userId => ({
+            user: userId, // Ensure userId is passed as ObjectId
+            hasPaid: false // Default to false
         }));
 
-        // Create the expense
+        // Create a new expense
         const newExpense = new Expense({
             expenseName,
             amount,
@@ -41,17 +49,17 @@ exports.addExpense = async (req, res) => {
         });
 
         // Save the expense to the database
-        await newExpense.save();
+        const savedExpense = await newExpense.save();
 
         res.status(201).json({
             message: 'Expense added successfully.',
-            expense: newExpense,
+            expense: savedExpense,
         });
     } catch (error) {
         console.error('Error adding expense:', error.message);
-        res.status(500).json({ 
-            message: 'Server error. Please try again later.', 
-            error: error.message 
+        res.status(500).json({
+            message: 'Server error. Please try again later.',
+            error: error.message,
         });
     }
 };
