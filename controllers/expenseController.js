@@ -150,6 +150,27 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       });
     }
   };
-  
+
+
+
+exports.getExpenseDetail = async (req, res) => {
+    const { expenseId } = req.params;
+    try {
+        const paymentIntent = await stripe.paymentIntents.retrieve(expenseId);
+        const charges = paymentIntent.charges.data;
+        const paymentStatus = charges.map(charge => ({
+            participant: charge.billing_details.name,
+            status: charge.status,
+            amountPaid: charge.amount / 100 // Convert from smallest currency unit
+        }));
+
+        // Assuming split details are stored in metadata
+        const splitDetails = paymentIntent.metadata.splitDetails ? JSON.parse(paymentIntent.metadata.splitDetails) : [];
+
+        res.json({ paymentStatus, splitDetails });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
 
 
