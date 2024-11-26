@@ -6,7 +6,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 exports.addExpense = async (req, res) => {
   try {
-    const { expenseName, amount, payer, participants, groupId } = req.body;
+    const { expenseName, amount, payer, participants, groupId, splitDetails } = req.body;
 
     console.log("Received Request Body:", req.body);
 
@@ -33,21 +33,28 @@ exports.addExpense = async (req, res) => {
       return res.status(404).json({ message: `Group with ID "${groupId}" not found.` });
     }
 
-    // Validate participants against the group
-    const validParticipants = [];
-    const groupParticipantIds = group.participants.map((p) => String(p.user._id)); // Extract user._id from group participants
+    // Extract valid participant IDs from the group
+    const groupParticipantIds = group.participants.map((p) => String(p.user._id));
 
-    for (const participantId of participants) {
-      if (groupParticipantIds.includes(String(participantId))) {
-        validParticipants.push(participantId);
-      } else {
-        console.warn(`Participant with ID "${participantId}" is not part of the group.`);
-      }
-    }
+    // Validate participants against the group
+    const validParticipants = participants.filter((id) =>
+      groupParticipantIds.includes(String(id))
+    );
 
     if (validParticipants.length === 0) {
       return res.status(400).json({
         message: "No valid participants found in the group.",
+      });
+    }
+
+    // Validate and filter split details
+    const validSplitDetails = splitDetails.filter((detail) =>
+      validParticipants.includes(String(detail.participant))
+    );
+
+    if (validSplitDetails.length !== validParticipants.length) {
+      return res.status(400).json({
+        message: "Split details do not match the valid participants.",
       });
     }
 
@@ -58,18 +65,19 @@ exports.addExpense = async (req, res) => {
       amountPaid: 0,
     }));
 
-    // Create a new expense
+    // Create and save the expense
     const newExpense = new Expense({
       expenseName,
       amount,
       payer,
       participants: formattedParticipants,
       group: groupId,
+      splitDetails: validSplitDetails,
     });
 
     const savedExpense = await newExpense.save();
 
-    // Update the payer's and participants' expense references
+    // Update payer's and participants' expense references
     await User.findByIdAndUpdate(payer, { $push: { expenses: savedExpense._id } });
 
     for (const participantId of validParticipants) {
@@ -88,6 +96,7 @@ exports.addExpense = async (req, res) => {
     });
   }
 };
+
 
 exports.confirmPaymentAndAddExpense = async (req, res) => {
   try {
@@ -125,7 +134,9 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
 
     // Validate participants
     const groupParticipantIds = group.participants.map((p) => String(p.user._id));
-    const validParticipants = participants.filter((id) => groupParticipantIds.includes(String(id)));
+    const validParticipants = participants.filter((id) =>
+      groupParticipantIds.includes(String(id))
+    );
 
     if (validParticipants.length === 0) {
       return res.status(400).json({
@@ -164,7 +175,7 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
     }
 
     res.status(201).json({
-      message: "Expense added successfully.",
+      message: "Payment verified, and expense added successfully.",
       expense: savedExpense,
     });
   } catch (error) {
@@ -175,6 +186,7 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
     });
   }
 };
+
 
 
 
