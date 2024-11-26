@@ -47,7 +47,7 @@ exports.getUserById = async (req, res) => {
     const { id } = req.params;
     console.log("Fetching user with ID:", id); // Debug log
 
-    const user = await User.findById(id).select('name email');
+    const user = await User.findById(id).select('email');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }

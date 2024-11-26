@@ -7,6 +7,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 exports.addExpense = async (req, res) => {
     try {
         const { expenseName, amount, payer, participants, groupId } = req.body;
+        
 
         // Log incoming data for debugging
         console.log('Received Request Body:', req.body);
@@ -87,34 +88,66 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       splitDetails,
     } = req.body;
 
-    console.log('Received request:', req.body);
+    console.log("Received request for expense:", req.body);
 
     if (!paymentIntentId) {
       return res.status(400).json({
-        message: 'PaymentIntentId is required for verification.',
+        message: "PaymentIntentId is required for verification.",
       });
     }
 
-    // Retrieve the PaymentIntent using the ID
+    // Retrieve and validate the PaymentIntent
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-
-    if (!paymentIntent || paymentIntent.status !== 'succeeded') {
-      console.error('Invalid or incomplete payment intent:', paymentIntent);
+    if (!paymentIntent || paymentIntent.status !== "succeeded") {
+      console.error("Invalid or incomplete payment intent:", paymentIntent);
       return res.status(400).json({
-        message: 'Payment not successful. Expense will not be added.',
+        message: "Payment not successful. Expense will not be added.",
       });
     }
 
-    console.log('PaymentIntent verified:', paymentIntent);
+    console.log("PaymentIntent verified:", paymentIntent);
 
-    // Prepare participants array
-    const formattedParticipants = participants.map((userId) => ({
+    // Validate Payer
+    const payerUser = await User.findById(payer);
+    if (!payerUser) {
+      return res.status(404).json({
+        message: `Payer with ID "${payer}" not found.`,
+      });
+    }
+
+    // Validate Group
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({
+        message: `Group with ID "${groupId}" not found.`,
+      });
+    }
+
+    // Validate Participants
+    const validParticipants = [];
+    for (const participantId of participants) {
+      const participant = await User.findById(participantId);
+      if (!participant) {
+        console.warn(`Participant with ID "${participantId}" not found.`);
+        continue;
+      }
+      validParticipants.push(participantId);
+    }
+
+    if (validParticipants.length === 0) {
+      return res.status(400).json({
+        message: "No valid participants found.",
+      });
+    }
+
+    // Prepare Participants Array
+    const formattedParticipants = validParticipants.map((userId) => ({
       user: userId,
       hasPaid: false,
       amountPaid: 0,
     }));
 
-    // Create a new expense with splitDetails
+    // Create Expense
     const newExpense = new Expense({
       expenseName,
       amount,
@@ -124,35 +157,42 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       splitDetails,
     });
 
-    // Save the expense and populate references
     const savedExpense = await newExpense.save();
 
-    // Update the payer's expenses array
-    await User.findByIdAndUpdate(payer, { $push: { expenses: savedExpense._id } });
-
-    // Update each participant's expenses array
-    for (const participant of participants) {
-      await User.findByIdAndUpdate(participant, { $push: { expenses: savedExpense._id } });
+    // Update Payer's Expenses
+    if (!payerUser.expenses.includes(savedExpense._id)) {
+      payerUser.expenses.push(savedExpense._id);
+      await payerUser.save();
     }
 
+    // Update Participants' Expenses
+    for (const participantId of validParticipants) {
+      await User.findByIdAndUpdate(participantId, {
+        $push: { expenses: savedExpense._id },
+      });
+    }
+
+    console.log("Expense added successfully:", savedExpense);
+
+    // Populate and Return Response
     const populatedExpense = await Expense.findById(savedExpense._id)
-      .populate('payer', 'name email')
-      .populate('participants.user', 'name email')
-      .populate('splitDetails.participant', 'name email');
+      .populate("payer", "name email")
+      .populate("participants.user", "name email")
+      .populate("splitDetails.participant", "name email");
 
     res.status(201).json({
-      message: 'Payment verified, and expense added successfully.',
+      message: "Payment verified, and expense added successfully.",
       expense: populatedExpense,
     });
   } catch (error) {
-    console.error('Error in payment confirmation and expense creation:', error);
-
+    console.error("Error in confirmPaymentAndAddExpense:", error);
     res.status(500).json({
-      message: 'Server error. Please try again later.',
+      message: "Server error. Please try again later.",
       error: error.message,
     });
   }
 };
+
 
 exports.getData = async (req, res) => {
   try {
