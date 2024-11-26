@@ -2,18 +2,14 @@
 
 const express = require('express');
 const router = express.Router();
-const expensesController = require('../controllers/expensesController');
+const expensesController = require('../controllers/expenseController');
 
 // Route to confirm payment and add expense
 router.post('/confirmPaymentAndAddExpense', expensesController.confirmPaymentAndAddExpense);
 
-// Route to get all expenses
+// Other routes...
 router.get('/show-data', expensesController.getData);
-
-// Route to get expense details
 router.get('/:expenseId', expensesController.getExpenseDetail);
-
-// Route to delete an expense
 router.delete('/:expenseId', expensesController.deleteExpense);
 
 module.exports = router;
