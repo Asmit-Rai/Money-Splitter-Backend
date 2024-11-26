@@ -4,6 +4,6 @@ const router = express.Router();
 
 router.post('/add-users', userController.addUser);
 // router.post('/get-user-id', userController.getUserId)
-router.get('/user/:id', userController.getUserId);
+router.get('/:id', userController.getUserId);
 
 module.exports = router;
