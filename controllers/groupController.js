@@ -3,110 +3,58 @@ const mongoose = require('mongoose');
 const User = require('../models/User')
 
 
-exports.addExpense = async (req, res) => {
+exports.addGroup = async (req, res) => {
+  const { email, groupName, participants } = req.body;
+
+  if (!email || !groupName || !participants || participants.length === 0) {
+    return res.status(400).json({ message: 'Group name and participants are required.' });
+  }
+
   try {
-    const { expenseName, amount, payer, participants, groupId } = req.body;
-
-    console.log("Received Request Body:", req.body);
-
-    // Validate required fields
-    if (!expenseName || !amount || !payer || !participants || !groupId) {
-      return res.status(400).json({
-        message: "All fields are required: expenseName, amount, payer, participants, groupId.",
-      });
+    // Find the user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
     }
 
-    if (!Array.isArray(participants) || participants.length === 0) {
-      return res.status(400).json({
-        message: "Participants should be a non-empty array of user IDs.",
-      });
-    }
-
-    if (isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ message: "Invalid amount. Must be a positive number." });
-    }
-
-    // Validate group existence and participants
-    const group = await Group.findById(groupId).populate("participants.user");
-    if (!group) {
-      return res.status(404).json({ message: `Group with ID "${groupId}" not found.` });
-    }
-
-    // Ensure all participants are part of the group
-    const validParticipants = [];
-    const groupParticipantIds = group.participants.map((p) => String(p.user._id));
-
-    for (const participantId of participants) {
-      if (groupParticipantIds.includes(String(participantId))) {
-        validParticipants.push(participantId);
-      } else {
-        console.warn(`Participant with ID "${participantId}" is not part of the group.`);
-      }
-    }
-
-    if (validParticipants.length === 0) {
-      return res.status(400).json({
-        message: "No valid participants found in the group.",
-      });
-    }
-
-    // Format participants array
-    const formattedParticipants = validParticipants.map((userId) => ({
-      user: userId,
-      hasPaid: false,
-      amountPaid: 0,
-    }));
-
-    // Create a new expense
-    const newExpense = new Expense({
-      expenseName,
-      amount,
-      payer,
-      participants: formattedParticipants,
-      group: groupId,
+    // Create the group
+    const newGroup = new Group({
+      groupName,
+      participants: participants.map((p) => ({ name: p.name, email: p.email })),
     });
 
-    const savedExpense = await newExpense.save();
+    const savedGroup = await newGroup.save();
 
-    // Update the payer's and participants' expense references
-    await User.findByIdAndUpdate(payer, { $push: { expenses: savedExpense._id } });
+    // Associate the group with the user
+    user.groups.push(savedGroup._id);
+    await user.save(); // Save the updated user
 
-    for (const participantId of validParticipants) {
-      await User.findByIdAndUpdate(participantId, { $push: { expenses: savedExpense._id } });
-    }
-
-    res.status(201).json({
-      message: "Expense added successfully.",
-      expense: savedExpense,
-    });
+    return res.status(201).json({ message: 'Group created successfully', group: savedGroup });
   } catch (error) {
-    console.error("Error adding expense:", error.message);
-    res.status(500).json({
-      message: "Server error. Please try again later.",
-      error: error.message,
-    });
+    console.error('Error saving group:', error.message);
+    return res.status(500).json({ message: 'Error saving group', error: error.message });
   }
 };
 
 
-
+// Fetch all groups
 exports.getData = async (req, res) => {
   const { email } = req.query;
 
   if (!email) {
-    return res.status(400).json({ message: 'Email is required to fetch groups.' });
+    return res.status(400).json({ message: "Email is required to fetch groups." });
   }
 
   try {
-    const user = await User.findOne({ email }).populate('groups');
+    const user = await User.findOne({ email }).populate("groups");
     if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
+      return res.status(404).json({ message: "User not found." });
     }
 
-    res.status(200).json({ userId: user._id, groups: user.groups });
+    res.status(200).json(user.groups);
   } catch (error) {
-    console.error('Error fetching groups:', error.message);
-    res.status(500).json({ message: 'Error fetching groups', error: error.message });
+    console.error("Error fetching groups:", error.message);
+    res.status(500).json({ message: "Error fetching groups", error: error.message });
   }
 };
 
