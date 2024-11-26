@@ -1,5 +1,6 @@
 const Expense = require('../models/Expense');
 const Group = require('../models/Group');
+const User = require('../models/User');
 require('dotenv').config();
 
 exports.addExpense = async (req, res) => {
@@ -52,6 +53,14 @@ exports.addExpense = async (req, res) => {
         // Save the expense to the database
         const savedExpense = await newExpense.save();
 
+        // Update the payer's expenses array
+        await User.findByIdAndUpdate(payer, { $push: { expenses: savedExpense._id } });
+
+        // Update each participant's expenses array
+        for (const participant of participants) {
+            await User.findByIdAndUpdate(participant, { $push: { expenses: savedExpense._id } });
+        }
+
         res.status(201).json({
             message: 'Expense added successfully.',
             expense: savedExpense,
@@ -65,8 +74,6 @@ exports.addExpense = async (req, res) => {
     }
 };
 
-
-// Server-side code (e.g., expensesController.js)
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 exports.confirmPaymentAndAddExpense = async (req, res) => {
@@ -121,6 +128,14 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
     // Save the expense and populate references
     const savedExpense = await newExpense.save();
 
+    // Update the payer's expenses array
+    await User.findByIdAndUpdate(payer, { $push: { expenses: savedExpense._id } });
+
+    // Update each participant's expenses array
+    for (const participant of participants) {
+      await User.findByIdAndUpdate(participant, { $push: { expenses: savedExpense._id } });
+    }
+
     const populatedExpense = await Expense.findById(savedExpense._id)
       .populate('payer', 'name email')
       .populate('participants.user', 'name email')
@@ -139,62 +154,3 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
     });
   }
 };
-
-
-
-
-  exports.getData = async (req, res) => {
-    try {
-      // Fetch all expenses from the database
-      const expenses = await Expense.find();
-      
-      // Respond with the data
-      res.status(200).json({
-        success: true,
-        expenses,
-      });
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch data',
-      });
-    }
-  };
-
-
-
-  exports.getExpenseDetail = async (req, res) => {
-    const { expenseId } = req.params;
-
-    try {
-        // Retrieve the PaymentIntent from Stripe
-        const paymentIntent = await stripe.paymentIntents.retrieve(expenseId);
-
-        if (!paymentIntent) {
-            return res.status(404).json({ error: 'PaymentIntent not found' });
-        }
-
-        const charges = paymentIntent.charges.data || [];
-        const paymentStatus = charges.map((charge) => ({
-            participant: charge.billing_details.name || 'Unknown',
-            status: charge.status,
-            amountPaid: charge.amount / 100, // Convert from smallest currency unit
-        }));
-
-        // Extract split details from metadata if available
-        const splitDetails = paymentIntent.metadata?.splitDetails
-            ? JSON.parse(paymentIntent.metadata.splitDetails)
-            : [];
-
-        res.json({ paymentStatus, splitDetails });
-    } catch (error) {
-        console.error('Error fetching expense details:', error.message);
-        res.status(500).json({
-            error: 'Failed to retrieve expense details',
-            details: error.message,
-        });
-    }
-};
-
-
