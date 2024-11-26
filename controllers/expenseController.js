@@ -67,11 +67,7 @@ exports.addGroup = async (req, res) => {
 
 // expensesController.js
 
-const Expense = require('../models/Expense');
-const Group = require('../models/Group');
-const User = require('../models/User');
-require('dotenv').config();
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 
 exports.confirmPaymentAndAddExpense = async (req, res) => {
   try {
