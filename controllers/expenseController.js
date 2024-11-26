@@ -205,3 +205,30 @@ exports.getExpenseDetail = async (req, res) => {
       });
   }
 };
+
+exports.deleteExpense = async (req, res) => {
+  const { expenseId } = req.params;
+
+  try {
+    const expense = await Expense.findById(expenseId);
+    if (!expense) {
+      return res.status(404).json({ message: 'Expense not found' });
+    }
+
+    // Remove the expense from the participants' expenses array
+    for (const participant of expense.participants) {
+      await User.findByIdAndUpdate(participant.user, { $pull: { expenses: expenseId } });
+    }
+
+    // Remove the expense from the payer's expenses array
+    await User.findByIdAndUpdate(expense.payer, { $pull: { expenses: expenseId } });
+
+    // Delete the expense
+    await Expense.findByIdAndDelete(expenseId);
+
+    res.status(200).json({ message: 'Expense deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting expense:', error.message);
+    res.status(500).json({ message: 'Server error. Please try again later.', error: error.message });
+  }
+};
