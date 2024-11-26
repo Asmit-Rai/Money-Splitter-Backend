@@ -21,17 +21,27 @@ exports.addUser = async (req, res) => {
     }
 };
 
-exports.getUserById = async (req, res) => {
-    const { userId } = req.params;
+exports.getUserId = async (req, res) => {
+  const { email } = req.body;
 
-    try {
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found.' });
-        }
-        return res.status(200).json({ name: user.name });
-    } catch (error) {
-        console.error('Error fetching user:', error.message);
-        return res.status(500).json({ error: 'Failed to fetch user', details: error.message });
+  // Validate input
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required.' });
+  }
+
+  try {
+    // Find the user by email
+    const user = await User.findOne({ email });
+
+    // Check if user exists
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
     }
+
+    // Return the user ID
+    return res.status(200).json({ userId: user._id });
+  } catch (error) {
+    console.error('Error in fetching user ID:', error.message);
+    return res.status(500).json({ error: 'Failed to fetch user ID', details: error.message });
+  }
 };
