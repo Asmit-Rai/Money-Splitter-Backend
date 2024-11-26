@@ -281,4 +281,4 @@ exports.deleteExpense = async (req, res) => {
     console.error('Error deleting expense:', error.message);
     res.status(500).json({ message: 'Server error. Please try again later.', error: error.message });
   }
-};y
+};
