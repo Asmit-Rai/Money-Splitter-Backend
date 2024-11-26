@@ -11,9 +11,10 @@ exports.addGroup = async (req, res) => {
   }
 
   try {
-    // Find the creator
+    console.log('Searching for creator with email:', email); // Debug log
     const creator = await User.findOne({ email });
     if (!creator) {
+      console.warn('Creator not found for email:', email); // Debug log
       return res.status(404).json({ error: 'Creator not found.' });
     }
 
@@ -49,7 +50,7 @@ exports.addGroup = async (req, res) => {
     return res.status(201).json({
       message: 'Group created successfully',
       group: savedGroup,
-      nonExistentEmails, // Notify frontend of any missing users
+      nonExistentEmails,
     });
   } catch (error) {
     console.error('Error saving group:', error.message);
