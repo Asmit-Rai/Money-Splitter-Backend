@@ -4,6 +4,7 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     groups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Group' }],
+    expenses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Expense' }], // Added reference to Expense
     createdAt: { type: Date, default: Date.now },
 });
 
