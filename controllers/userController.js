@@ -38,15 +38,20 @@ exports.getUserId = async (req, res) => {
 
 exports.getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('name email');
+    const { id } = req.params;
+    console.log("Fetching user with ID:", id); // Debug log
+
+    const user = await User.findById(id).select('name email');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+
     res.json(user);
   } catch (error) {
-    console.error('Error fetching user:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error fetching user by ID:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 
