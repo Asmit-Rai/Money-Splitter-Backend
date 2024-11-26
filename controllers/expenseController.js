@@ -89,9 +89,6 @@ exports.addExpense = async (req, res) => {
   }
 };
 
-
-
-
 exports.confirmPaymentAndAddExpense = async (req, res) => {
   try {
     const {
@@ -140,22 +137,7 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
     }
 
     // Validate Participants
-    const validParticipants = [];
-    for (const participantId of participants) {
-      const participant = await User.findById(participantId);
-      if (!participant) {
-        console.warn(`Participant with ID "${participantId}" not found.`);
-        continue;
-      }
-      validParticipants.push(participantId);
-    }
-
-    if (validParticipants.length === 0) {
-      return res.status(400).json({
-        message: "No valid participants found.",
-      });
-    }
-
+  
     // Prepare Participants Array
     const formattedParticipants = validParticipants.map((userId) => ({
       user: userId,
@@ -214,7 +196,6 @@ exports.getData = async (req, res) => {
   try {
     // Fetch all expenses from the database
     const expenses = await Expense.find();
-    
     // Respond with the data
     res.status(200).json({
       success: true,
