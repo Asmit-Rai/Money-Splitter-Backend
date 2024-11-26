@@ -22,23 +22,27 @@ exports.addGroup = async (req, res) => {
 
     const savedGroup = await newGroup.save();
 
-    // Add the group to the creator's record
-    creator.groups.push(savedGroup._id);
-    await creator.save();
+    // Add the group to the creator's user record
+    if (!creator.groups.includes(savedGroup._id)) {
+      creator.groups.push(savedGroup._id);
+      await creator.save();
+    }
 
     // Handle participants
     const nonExistentEmails = [];
     for (const participant of participants) {
       const user = await User.findOne({ email: participant.email });
       if (user) {
-        user.groups.push(savedGroup._id);
-        await user.save(); // Save updated user record
+        if (!user.groups.includes(savedGroup._id)) {
+          user.groups.push(savedGroup._id);
+          await user.save(); // Save updated user record
+        }
       } else {
         nonExistentEmails.push(participant.email);
       }
     }
 
-    // Return the response
+    // Return success response
     return res.status(201).json({
       message: 'Group created successfully',
       group: savedGroup,
@@ -49,6 +53,7 @@ exports.addGroup = async (req, res) => {
     return res.status(500).json({ message: 'Error saving group', error: error.message });
   }
 };
+
 
 exports.getUserId = async (req, res) => {
   const { email } = req.body;
