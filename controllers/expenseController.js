@@ -4,7 +4,7 @@ const User = require('../models/User');
 require('dotenv').config();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-exports.addExpense = async (req, res) => {
+eexports.addExpense = async (req, res) => {
   try {
     const { expenseName, amount, payer, participants, groupId } = req.body;
 
@@ -88,6 +88,7 @@ exports.addExpense = async (req, res) => {
     });
   }
 };
+
 
 
 exports.confirmPaymentAndAddExpense = async (req, res) => {
