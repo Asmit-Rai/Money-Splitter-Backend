@@ -77,13 +77,12 @@ exports.getData = async (req, res) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
-    res.status(200).json(user.groups);
+    res.status(200).json({ userId: user._id, groups: user.groups });
   } catch (error) {
     console.error('Error fetching groups:', error.message);
     res.status(500).json({ message: 'Error fetching groups', error: error.message });
   }
 };
-
 
 
 

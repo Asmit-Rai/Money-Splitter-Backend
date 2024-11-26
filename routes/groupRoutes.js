@@ -9,6 +9,4 @@ router.delete('/:id', groupController.deleteGroup);
 router.get('/:id', groupController.getId);
 
 
-
-
 module.exports = router;
