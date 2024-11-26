@@ -1,7 +1,7 @@
 const User = require('../models/User');
 
 exports.addUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, groups, expenses } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password are required.' });
@@ -13,7 +13,7 @@ exports.addUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists.' });
     }
 
-    const newUser = new User({ email, password });
+    const newUser = new User({ email, password, groups, expenses });
     const savedUser = await newUser.save();
     return res.status(201).json({ message: 'User created successfully', user: savedUser });
   } catch (error) {
@@ -21,7 +21,6 @@ exports.addUser = async (req, res) => {
     return res.status(500).json({ message: 'Error adding user', error: error.message });
   }
 };
-
 
 exports.getUserId = async (req, res) => {
   const { email } = req.body;
@@ -47,7 +46,7 @@ exports.getUserById = async (req, res) => {
     const { id } = req.params;
     console.log("Fetching user with ID:", id); // Debug log
 
-    const user = await User.findById(id).select('email');
+    const user = await User.findById(id).select('email groups expenses');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -58,6 +57,3 @@ exports.getUserById = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
-
-
