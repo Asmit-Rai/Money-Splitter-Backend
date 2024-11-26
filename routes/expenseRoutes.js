@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const expensesController = require('../controllers/expensesController'); // Adjust the path as necessary
+const expensesController = require('../controllers/expenseController'); // Adjust the path as necessary
 
 // Define routes and map to controller functions
 router.post('/addExpense', expensesController.addExpense);
