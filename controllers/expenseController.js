@@ -101,8 +101,6 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       splitDetails,
     } = req.body;
 
-    console.log("Received request for expense:", req.body);
-
     if (!paymentIntentId) {
       return res.status(400).json({
         message: "PaymentIntentId is required for verification.",
@@ -112,75 +110,62 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
     // Retrieve and validate the PaymentIntent
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     if (!paymentIntent || paymentIntent.status !== "succeeded") {
-      console.error("Invalid or incomplete payment intent:", paymentIntent);
       return res.status(400).json({
         message: "Payment not successful. Expense will not be added.",
       });
     }
 
-    console.log("PaymentIntent verified:", paymentIntent);
-
-    // Validate Payer
-    const payerUser = await User.findById(payer);
-    if (!payerUser) {
-      return res.status(404).json({
-        message: `Payer with ID "${payer}" not found.`,
-      });
-    }
-
-    // Validate Group
-    const group = await Group.findById(groupId);
+    // Validate group existence
+    const group = await Group.findById(groupId).populate("participants.user");
     if (!group) {
       return res.status(404).json({
         message: `Group with ID "${groupId}" not found.`,
       });
     }
 
-    // Validate Participants
-  
-    // Prepare Participants Array
-    const formattedParticipants = validParticipants.map((userId) => ({
-      user: userId,
-      hasPaid: false,
-      amountPaid: 0,
-    }));
+    // Validate participants
+    const groupParticipantIds = group.participants.map((p) => String(p.user._id));
+    const validParticipants = participants.filter((id) => groupParticipantIds.includes(String(id)));
 
-    // Create Expense
+    if (validParticipants.length === 0) {
+      return res.status(400).json({
+        message: "No valid participants found in the group.",
+      });
+    }
+
+    // Validate split details
+    const validSplitDetails = splitDetails.filter((detail) =>
+      validParticipants.includes(String(detail.participant))
+    );
+
+    if (validSplitDetails.length !== validParticipants.length) {
+      return res.status(400).json({
+        message: "Split details do not match the valid participants.",
+      });
+    }
+
+    // Create and save the expense
     const newExpense = new Expense({
       expenseName,
       amount,
       payer,
-      participants: formattedParticipants,
+      participants: validParticipants.map((id) => ({ user: id, hasPaid: false, amountPaid: 0 })),
       group: groupId,
-      splitDetails,
+      splitDetails: validSplitDetails,
     });
 
     const savedExpense = await newExpense.save();
 
-    // Update Payer's Expenses
-    if (!payerUser.expenses.includes(savedExpense._id)) {
-      payerUser.expenses.push(savedExpense._id);
-      await payerUser.save();
-    }
+    // Update user references
+    await User.findByIdAndUpdate(payer, { $push: { expenses: savedExpense._id } });
 
-    // Update Participants' Expenses
     for (const participantId of validParticipants) {
-      await User.findByIdAndUpdate(participantId, {
-        $push: { expenses: savedExpense._id },
-      });
+      await User.findByIdAndUpdate(participantId, { $push: { expenses: savedExpense._id } });
     }
-
-    console.log("Expense added successfully:", savedExpense);
-
-    // Populate and Return Response
-    const populatedExpense = await Expense.findById(savedExpense._id)
-      .populate("payer", "name email")
-      .populate("participants.user", "name email")
-      .populate("splitDetails.participant", "name email");
 
     res.status(201).json({
-      message: "Payment verified, and expense added successfully.",
-      expense: populatedExpense,
+      message: "Expense added successfully.",
+      expense: savedExpense,
     });
   } catch (error) {
     console.error("Error in confirmPaymentAndAddExpense:", error);
@@ -190,6 +175,7 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
     });
   }
 };
+
 
 
 exports.getData = async (req, res) => {
