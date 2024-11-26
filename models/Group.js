@@ -1,17 +1,12 @@
+// models/Group.js
+
 const mongoose = require('mongoose');
 
-const groupSchema = new mongoose.Schema({
+const GroupSchema = new mongoose.Schema({
     groupName: { type: String, required: true },
-    participants: [
-        {
-            user: { 
-                type: mongoose.Schema.Types.ObjectId, 
-                ref: 'User', 
-                required: true 
-            }
-        }
-    ],
-    createdAt: { type: Date, default: Date.now },
-});
+    participants: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    }],
+}, { timestamps: true });
 
-module.exports = mongoose.model('Group', groupSchema);
+module.exports = mongoose.model('Group', GroupSchema);
