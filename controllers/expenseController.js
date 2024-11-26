@@ -65,6 +65,10 @@ exports.addExpense = async (req, res) => {
     }
 };
 
+// Server-side code (e.g., expensesController.js)
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+// expensesController.js
+
 
 
 exports.confirmPaymentAndAddExpense = async (req, res) => {
@@ -277,4 +281,4 @@ exports.deleteExpense = async (req, res) => {
     console.error('Error deleting expense:', error.message);
     res.status(500).json({ message: 'Server error. Please try again later.', error: error.message });
   }
-};
+};y
