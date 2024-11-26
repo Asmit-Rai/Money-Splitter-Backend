@@ -48,7 +48,7 @@ const expenseSchema = new mongoose.Schema({
     group: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Group', 
-        required: true 
+        required: [true, "Group reference is required"]
     },
     createdAt: { type: Date, default: Date.now }
 });
