@@ -65,9 +65,11 @@ exports.addExpense = async (req, res) => {
     }
 };
 
-
 // Server-side code (e.g., expensesController.js)
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+// expensesController.js
+
+
 
 exports.confirmPaymentAndAddExpense = async (req, res) => {
   try {
@@ -75,7 +77,7 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       expenseName,
       amount,
       payer,
-      participants,
+      participants, // Array of user IDs
       groupId,
       paymentIntentId,
       splitDetails,
@@ -83,6 +85,14 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
 
     console.log('Received request:', req.body);
 
+    // Validate required fields
+    if (!expenseName || !amount || !payer || !participants || !groupId || !splitDetails) {
+      return res.status(400).json({
+        message: 'All fields are required: expenseName, amount, payer, participants, groupId, splitDetails.'
+      });
+    }
+
+    // Validate paymentIntentId
     if (!paymentIntentId) {
       return res.status(400).json({
         message: 'PaymentIntentId is required for verification.',
@@ -101,8 +111,48 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
 
     console.log('PaymentIntent verified:', paymentIntent);
 
-    // Prepare participants array
-    const formattedParticipants = participants.map((userId) => ({
+    // Validate group existence and participants
+    const group = await Group.findById(groupId).populate("participants.user");
+    if (!group) {
+      return res.status(404).json({
+        message: `Group with ID "${groupId}" not found.`,
+      });
+    }
+
+    // Extract valid participant IDs from the group
+    const groupParticipantIds = group.participants.map((p) => String(p.user._id));
+
+    console.log('Group Participant IDs:', groupParticipantIds);
+    console.log('Expense Participants:', participants);
+
+    // Validate participants against the group
+    const validParticipants = participants.filter((id) =>
+      groupParticipantIds.includes(String(id))
+    );
+
+    console.log('Valid Participants:', validParticipants);
+
+    if (validParticipants.length === 0) {
+      return res.status(400).json({
+        message: 'No valid participants found in the group.',
+      });
+    }
+
+    // Validate and filter splitDetails
+    const validSplitDetails = splitDetails.filter((detail) =>
+      validParticipants.includes(String(detail.participant))
+    );
+
+    console.log('Valid Split Details:', validSplitDetails);
+
+    if (validSplitDetails.length !== validParticipants.length) {
+      return res.status(400).json({
+        message: 'Split details do not match the valid participants.',
+      });
+    }
+
+    // Format participants for the expense
+    const formattedParticipants = validParticipants.map((userId) => ({
       user: userId,
       hasPaid: false,
       amountPaid: 0,
@@ -115,12 +165,20 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       payer,
       participants: formattedParticipants,
       group: groupId,
-      splitDetails,
+      splitDetails: validSplitDetails,
     });
 
-    // Save the expense and populate references
+    // Save the expense to the database
     const savedExpense = await newExpense.save();
 
+    // Update payer's and participants' expense references
+    await User.findByIdAndUpdate(payer, { $push: { expenses: savedExpense._id } });
+
+    for (const participantId of validParticipants) {
+      await User.findByIdAndUpdate(participantId, { $push: { expenses: savedExpense._id } });
+    }
+
+    // Populate the expense for detailed response
     const populatedExpense = await Expense.findById(savedExpense._id)
       .populate('payer', 'name email')
       .populate('participants.user', 'name email')
@@ -131,14 +189,14 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       expense: populatedExpense,
     });
   } catch (error) {
-    console.error('Error in payment confirmation and expense creation:', error);
-
+    console.error('Error in confirmPaymentAndAddExpense:', error.message);
     res.status(500).json({
       message: 'Server error. Please try again later.',
       error: error.message,
     });
   }
 };
+
 
 
 
@@ -198,3 +256,29 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
 };
 
 
+exports.deleteExpense = async (req, res) => {
+  const { expenseId } = req.params;
+
+  try {
+    const expense = await Expense.findById(expenseId);
+    if (!expense) {
+      return res.status(404).json({ message: 'Expense not found' });
+    }
+
+    // Remove the expense from the participants' expenses array
+    for (const participant of expense.participants) {
+      await User.findByIdAndUpdate(participant.user, { $pull: { expenses: expenseId } });
+    }
+
+    // Remove the expense from the payer's expenses array
+    await User.findByIdAndUpdate(expense.payer, { $pull: { expenses: expenseId } });
+
+    // Delete the expense
+    await Expense.findByIdAndDelete(expenseId);
+
+    res.status(200).json({ message: 'Expense deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting expense:', error.message);
+    res.status(500).json({ message: 'Server error. Please try again later.', error: error.message });
+  }
+};

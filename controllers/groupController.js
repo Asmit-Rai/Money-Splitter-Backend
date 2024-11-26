@@ -3,65 +3,91 @@ const mongoose = require('mongoose');
 const User = require('../models/User')
 
 
-exports.addGroup = async (req, res) => {
-  const { email, groupName, participants } = req.body;
-
-  if (!email || !groupName || !participants || participants.length === 0) {
-    return res.status(400).json({ message: 'Group name and participants are required.' });
-  }
-
+exports.addExpense = async (req, res) => {
   try {
-    console.log('Searching for creator with email:', email); 
-    const creator = await User.findOne({ email });
-    if (!creator) {
-      return res.status(404).json({ error: 'Creator not found.' });
+    const { expenseName, amount, payer, participants, groupId } = req.body;
+
+    console.log("Received Request Body:", req.body);
+
+    // Validate required fields
+    if (!expenseName || !amount || !payer || !participants || !groupId) {
+      return res.status(400).json({
+        message: "All fields are required: expenseName, amount, payer, participants, groupId.",
+      });
     }
 
-    const nonExistentEmails = [];
-    const participantReferences = [];
+    if (!Array.isArray(participants) || participants.length === 0) {
+      return res.status(400).json({
+        message: "Participants should be a non-empty array of user IDs.",
+      });
+    }
 
-    for (const participant of participants) {
-      const user = await User.findOne({ email: participant.email });
-      if (user) {
-        participantReferences.push({ user: user._id });
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ message: "Invalid amount. Must be a positive number." });
+    }
+
+    // Validate group existence and participants
+    const group = await Group.findById(groupId).populate("participants.user");
+    if (!group) {
+      return res.status(404).json({ message: `Group with ID "${groupId}" not found.` });
+    }
+
+    // Ensure all participants are part of the group
+    const validParticipants = [];
+    const groupParticipantIds = group.participants.map((p) => String(p.user._id));
+
+    for (const participantId of participants) {
+      if (groupParticipantIds.includes(String(participantId))) {
+        validParticipants.push(participantId);
       } else {
-        nonExistentEmails.push(participant.email);
+        console.warn(`Participant with ID "${participantId}" is not part of the group.`);
       }
     }
 
-    // Create the new group
-    const newGroup = new Group({
-      groupName,
-      participants: participantReferences,
+    if (validParticipants.length === 0) {
+      return res.status(400).json({
+        message: "No valid participants found in the group.",
+      });
+    }
+
+    // Format participants array
+    const formattedParticipants = validParticipants.map((userId) => ({
+      user: userId,
+      hasPaid: false,
+      amountPaid: 0,
+    }));
+
+    // Create a new expense
+    const newExpense = new Expense({
+      expenseName,
+      amount,
+      payer,
+      participants: formattedParticipants,
+      group: groupId,
     });
 
-    const savedGroup = await newGroup.save();
+    const savedExpense = await newExpense.save();
 
-    // Add the group to the creator's user record
-    if (!creator.groups.includes(savedGroup._id)) {
-      creator.groups.push(savedGroup._id);
-      await creator.save();
+    // Update the payer's and participants' expense references
+    await User.findByIdAndUpdate(payer, { $push: { expenses: savedExpense._id } });
+
+    for (const participantId of validParticipants) {
+      await User.findByIdAndUpdate(participantId, { $push: { expenses: savedExpense._id } });
     }
 
-    // Add the group to all participant user records
-    for (const reference of participantReferences) {
-      const user = await User.findById(reference.user);
-      if (user && !user.groups.includes(savedGroup._id)) {
-        user.groups.push(savedGroup._id);
-        await user.save();
-      }
-    }
-
-    return res.status(201).json({
-      message: 'Group created successfully',
-      group: savedGroup,
-      nonExistentEmails,
+    res.status(201).json({
+      message: "Expense added successfully.",
+      expense: savedExpense,
     });
   } catch (error) {
-    console.error('Error saving group:', error.message);
-    return res.status(500).json({ message: 'Error saving group', error: error.message });
+    console.error("Error adding expense:", error.message);
+    res.status(500).json({
+      message: "Server error. Please try again later.",
+      error: error.message,
+    });
   }
 };
+
 
 
 exports.getData = async (req, res) => {
