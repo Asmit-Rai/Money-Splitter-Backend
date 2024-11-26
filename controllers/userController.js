@@ -22,16 +22,16 @@ exports.addUser = async (req, res) => {
 };
 
 exports.getUserById = async (req, res) => {
-  const { userId } = req.params;
+    const { userId } = req.params;
 
-  try {
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found.' });
+    try {
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        return res.status(200).json({ name: user.name });
+    } catch (error) {
+        console.error('Error fetching user:', error.message);
+        return res.status(500).json({ error: 'Failed to fetch user', details: error.message });
     }
-    return res.status(200).json({ name: user.name });
-  } catch (error) {
-    console.error('Error fetching user:', error.message);
-    return res.status(500).json({ error: 'Failed to fetch user', details: error.message });
-  }
 };
