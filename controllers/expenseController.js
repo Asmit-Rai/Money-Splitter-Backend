@@ -27,15 +27,15 @@ exports.addExpense = async (req, res) => {
       return res.status(400).json({ message: "Invalid amount. Must be a positive number." });
     }
 
-    // Validate group existence and participants
+    // Validate group existence and populate participants
     const group = await Group.findById(groupId).populate("participants.user");
     if (!group) {
       return res.status(404).json({ message: `Group with ID "${groupId}" not found.` });
     }
 
-    // Ensure all participants are part of the group
+    // Validate participants against the group
     const validParticipants = [];
-    const groupParticipantIds = group.participants.map((p) => String(p.user._id));
+    const groupParticipantIds = group.participants.map((p) => String(p.user._id)); // Extract user._id from group participants
 
     for (const participantId of participants) {
       if (groupParticipantIds.includes(String(participantId))) {
@@ -51,7 +51,7 @@ exports.addExpense = async (req, res) => {
       });
     }
 
-    // Format participants array
+    // Format participants for the expense
     const formattedParticipants = validParticipants.map((userId) => ({
       user: userId,
       hasPaid: false,
@@ -88,6 +88,7 @@ exports.addExpense = async (req, res) => {
     });
   }
 };
+
 
 
 
