@@ -1,24 +1,53 @@
 const User = require('../models/User');
 
-exports.addUser = async (req, res) => {
-    const { email, password } = req.body;
+exports.addGroup = async (req, res) => {
+  const { email, groupName, participants } = req.body;
 
-    // Validate inputs
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Email and password are required.' });
+  if (!email || !groupName || !participants || participants.length === 0) {
+    return res.status(400).json({ message: 'Group name and participants are required.' });
+  }
+
+  try {
+    // Find the creator
+    const creator = await User.findOne({ email });
+    if (!creator) {
+      return res.status(404).json({ error: 'Creator not found.' });
     }
 
-    try {
-        // Create a new user
-        const newUser = new User({ email, password });
-        const savedUser = await newUser.save();
+    // Create the new group
+    const newGroup = new Group({
+      groupName,
+      participants: participants.map((p) => ({ name: p.name, email: p.email })),
+    });
 
-        // Return success response
-        return res.status(201).json({ message: 'User created successfully', user: savedUser });
-    } catch (error) {
-        console.error('Error in Creating User:', error.message);
-        return res.status(500).json({ error: 'Failed to create user', details: error.message });
+    const savedGroup = await newGroup.save();
+
+    // Add the group to the creator's record
+    creator.groups.push(savedGroup._id);
+    await creator.save();
+
+    // Handle participants
+    const nonExistentEmails = [];
+    for (const participant of participants) {
+      const user = await User.findOne({ email: participant.email });
+      if (user) {
+        user.groups.push(savedGroup._id);
+        await user.save(); // Save updated user record
+      } else {
+        nonExistentEmails.push(participant.email);
+      }
     }
+
+    // Return the response
+    return res.status(201).json({
+      message: 'Group created successfully',
+      group: savedGroup,
+      nonExistentEmails, // Notify frontend of any missing users
+    });
+  } catch (error) {
+    console.error('Error saving group:', error.message);
+    return res.status(500).json({ message: 'Error saving group', error: error.message });
+  }
 };
 
 exports.getUserId = async (req, res) => {
