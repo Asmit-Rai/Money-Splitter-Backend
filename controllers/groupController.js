@@ -11,13 +11,13 @@ exports.addGroup = async (req, res) => {
   }
 
   try {
-    // Find the user by email
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found.' });
+    // Find the creator user
+    const creator = await User.findOne({ email });
+    if (!creator) {
+      return res.status(404).json({ error: 'Creator not found.' });
     }
 
-    // Create the group
+    // Create a new group
     const newGroup = new Group({
       groupName,
       participants: participants.map((p) => ({ name: p.name, email: p.email })),
@@ -25,11 +25,28 @@ exports.addGroup = async (req, res) => {
 
     const savedGroup = await newGroup.save();
 
-    // Associate the group with the user
-    user.groups.push(savedGroup._id);
-    await user.save(); // Save the updated user
+    // Add the group to the creator's user record
+    creator.groups.push(savedGroup._id);
+    await creator.save();
 
-    return res.status(201).json({ message: 'Group created successfully', group: savedGroup });
+    // Handle participants
+    const nonExistentEmails = [];
+    for (const participant of participants) {
+      const user = await User.findOne({ email: participant.email });
+      if (user) {
+        user.groups.push(savedGroup._id);
+        await user.save(); // Save updated user record
+      } else {
+        nonExistentEmails.push(participant.email);
+      }
+    }
+
+    // Return success response
+    return res.status(201).json({
+      message: 'Group created successfully',
+      group: savedGroup,
+      nonExistentEmails, // Emails not found in the database
+    });
   } catch (error) {
     console.error('Error saving group:', error.message);
     return res.status(500).json({ message: 'Error saving group', error: error.message });
