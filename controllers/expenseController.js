@@ -6,6 +6,9 @@ const User = require("../models/User");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const axios = require('axios'); // Add this line to import Axios
+const pinataApiKey = process.env.PINATA_API_KEY;
+const pinataSecretApiKey = process.env.PINATA_SECRET_API_KEY;
+const ethers = require('ethers');
 
 // Add Expense
 exports.addExpense = async (req, res) => {
@@ -328,63 +331,57 @@ const fetchPaymentHistory = async (expense) => {
 
 // controllers/expenseController.js
 
-const pinataSDK = require('@pinata/sdk');
+// controllers/expenseController.js
+
+
 
 exports.storeData = async (req, res, wallet, provider) => {
   try {
-    const { data } = req.body;
+    const data = req.body;
 
-    if (!data) {
-      return res.status(400).json({ message: 'Data is required.' });
-    }
+    // Pin data to IPFS using Pinata
+    const response = await axios.post(
+      'https://api.pinata.cloud/pinning/pinJSONToIPFS',
+      {
+        pinataContent: data,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          pinata_api_key: pinataApiKey,
+          pinata_secret_api_key: pinataSecretApiKey,
+        },
+      }
+    );
 
-    // Check wallet balance
-    const balance = await wallet.getBalance();
-    if (balance.isZero()) {
-      return res.status(400).json({ message: 'Insufficient wallet balance for transaction.' });
-    }
+    const ipfsHash = response.data.IpfsHash;
+    console.log('Data pinned to IPFS with hash:', ipfsHash);
 
-    // Initialize Pinata SDK
-    const pinata = pinataSDK(process.env.PINATA_API_KEY, process.env.PINATA_SECRET_API_KEY);
+    // Interact with Ethereum blockchain
+    // Replace with your smart contract ABI and address
+    const contractABI = [/* Your Contract ABI */];
+    const contractAddress = 'YOUR_CONTRACT_ADDRESS';
 
-    // Pin JSON to IPFS
-    let ipfsHash;
-    try {
-      const result = await pinata.pinJSONToIPFS(data);
-      ipfsHash = result.IpfsHash;
-      console.log('Data pinned to IPFS with CID:', ipfsHash);
-    } catch (pinataError) {
-      console.error('Pinata SDK Error:', pinataError);
-      return res.status(500).json({
-        message: 'Failed to pin data to IPFS.',
-        error: pinataError.message,
-      });
-    }
+    const contract = new ethers.Contract(contractAddress, contractABI, wallet);
 
-    // Store the IPFS hash on the blockchain
-    const tx = {
-      to: wallet.address, // Sending to self or a specific address if required
-      value: ethers.utils.parseEther('0.0'), // Sending 0 Ether
-      data: ethers.utils.hexlify(ethers.utils.toUtf8Bytes(ipfsHash)),
-      gasLimit: 100000,
-    };
-
-    // Estimate gas price
-    const gasPrice = await provider.getGasPrice();
-    tx.gasPrice = gasPrice;
-
-    const transactionResponse = await wallet.sendTransaction(tx);
-    const receipt = await transactionResponse.wait();
-
-    console.log('IPFS hash stored on blockchain with tx hash:', receipt.transactionHash);
+    // Assume your contract has a function to store the IPFS hash
+    const tx = await contract.storeExpense(ipfsHash);
+    await tx.wait();
+    console.log('Data stored on blockchain with transaction hash:', tx.hash);
 
     res.status(200).json({
-      message: 'Data stored on IPFS and blockchain successfully.',
-      ipfsHash,
-      transactionHash: receipt.transactionHash,
+      message: 'Data stored successfully.',
+      ipfsHash: ipfsHash,
+      transactionHash: tx.hash,
     });
   } catch (error) {
-    console.error('Error storing data:', error);
-    res.status(500).json({ message: 'Failed to store data.', error: error.message });
+    console.error(
+      'Error storing data:',
+      error.response ? error.response.data : error.message
+    );
+    res.status(500).json({
+      message: 'Failed to store data.',
+      error: error.message,
+    });
   }
 };
