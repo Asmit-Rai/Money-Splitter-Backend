@@ -1,3 +1,5 @@
+// server.js
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -27,6 +29,9 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Initialize Ethereum provider using Alchemy
 const provider = new ethers.providers.JsonRpcProvider(`https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`);
+
+// Create a wallet instance
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 // Initialize IPFS client using a public gateway
 const ipfs = create({ url: 'https://ipfs.io' }); // Using ipfs.io public gateway
