@@ -8,7 +8,7 @@ const expenseRoutes = require('./routes/expenseRoutes');
 
 require('dotenv').config(); // Load environment variables
 const ethers = require('ethers'); // Correct import
-const { create }= require('ipfs-http-client'); // Import create from ipfs-http-client
+const { create } = require('ipfs-http-client'); // Import create from ipfs-http-client
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -28,6 +28,8 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 // Initialize Ethereum provider using Alchemy
 const provider = new ethers.providers.JsonRpcProvider(`https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`);
 
+// Initialize IPFS client using a public gateway
+const ipfs = create({ url: 'https://ipfs.io' }); // Using ipfs.io public gateway
 
 // Existing /payment-sheet endpoint
 app.post('/payment-sheet', async (req, res) => {
@@ -66,12 +68,6 @@ app.post('/payment-sheet', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// Create a wallet instance
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-
-// Initialize IPFS client using a public gateway
-const ipfs = IPFS.create({ url: 'https://ipfs.io' }); // Using ipfs.io public gateway
 
 // API endpoint to store data on IPFS and blockchain
 app.post('/store-data', async (req, res) => {
