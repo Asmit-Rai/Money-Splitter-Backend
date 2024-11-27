@@ -50,6 +50,10 @@ const expenseSchema = new mongoose.Schema({
         ref: 'Group', 
         required: true 
     },
+    paymentIntentId: {
+        type: String,
+        required: true,
+      }
     createdAt: { type: Date, default: Date.now }
 });
 
