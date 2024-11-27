@@ -1,3 +1,5 @@
+// server.js
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -9,7 +11,7 @@ const morgan = require('morgan'); // Import Morgan
 
 require('dotenv').config();
 const ethers = require('ethers');
-const { create } = require('ipfs-http-client');
+// const { create } = require('ipfs-http-client'); // No longer needed since using Pinata SDK
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -38,9 +40,6 @@ const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 // Pass wallet and provider to storeData
 const expenseController = require('./controllers/expenseController');
 app.post('/store-data', (req, res) => expenseController.storeData(req, res, wallet, provider));
-
-// Initialize IPFS client using a public gateway (no longer used for pinning)
-const ipfs = create({ url: 'https://ipfs.io' }); 
 
 // Existing /payment-sheet endpoint
 app.post('/payment-sheet', async (req, res) => {
