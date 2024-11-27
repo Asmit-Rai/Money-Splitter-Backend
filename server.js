@@ -33,8 +33,8 @@ const provider = new ethers.providers.JsonRpcProvider(`https://eth-goerli.alchem
 // Create a wallet instance
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-// Initialize IPFS client using a public gateway
-const ipfs = create({ url: 'https://ipfs.io' }); // Using ipfs.io public gateway
+// Initialize IPFS client using a public gateway (no longer used for pinning)
+const ipfs = create({ url: 'https://ipfs.io' }); // Retain if needed elsewhere
 
 // Existing /payment-sheet endpoint
 app.post('/payment-sheet', async (req, res) => {
@@ -54,7 +54,7 @@ app.post('/payment-sheet', async (req, res) => {
     // Create a PaymentIntent
     const paymentIntent = await stripe.paymentIntents.create({
       amount: money,
-      currency: 'eur',
+      currency: 'eur', // Consider changing to 'inr' if using Indian Rupees
       customer: customer.id,
       automatic_payment_methods: {
         enabled: true,
@@ -74,49 +74,10 @@ app.post('/payment-sheet', async (req, res) => {
   }
 });
 
-// API endpoint to store data on IPFS and blockchain
-app.post('/store-data', async (req, res) => {
-  try {
-    const { data } = req.body;
+// API endpoint to store data on IPFS and blockchain via Pinata
+const expenseController = require('./controllers/expenseController'); // Ensure correct path
 
-    if (!data) {
-      return res.status(400).json({ message: 'Data is required.' });
-    }
-
-    // Add data to IPFS
-    const added = await ipfs.add(data);
-    const ipfsHash = added.path; // or added.cid.toString()
-
-    console.log('Data added to IPFS with CID:', ipfsHash);
-
-    // Prepare the transaction to store the IPFS hash on the blockchain
-    const tx = {
-      to: wallet.address, // Sending to self; can be any address
-      value: ethers.utils.parseEther('0.0'), // Sending 0 Ether
-      data: ethers.utils.hexlify(ethers.utils.toUtf8Bytes(ipfsHash)),
-      gasLimit: 100000, // Adjust gas limit as needed
-    };
-
-    // Estimate gas price
-    const gasPrice = await provider.getGasPrice();
-    tx.gasPrice = gasPrice;
-
-    // Send the transaction
-    const transactionResponse = await wallet.sendTransaction(tx);
-    await transactionResponse.wait();
-
-    console.log('IPFS hash stored on blockchain with tx hash:', transactionResponse.hash);
-
-    res.status(200).json({
-      message: 'Data stored on IPFS and blockchain successfully.',
-      ipfsHash,
-      transactionHash: transactionResponse.hash,
-    });
-  } catch (error) {
-    console.error('Error storing data:', error);
-    res.status(500).json({ message: 'Failed to store data.', error: error.message });
-  }
-});
+app.post('/store-data', expenseController.storeData);
 
 // Start the server
 app.listen(port, () => {

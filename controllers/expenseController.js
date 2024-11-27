@@ -5,6 +5,7 @@ const Group = require("../models/Group");
 const User = require("../models/User");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const axios = require('axios'); // Import Axios
 
 // Add Expense
 exports.addExpense = async (req, res) => {
@@ -204,8 +205,20 @@ exports.getExpenseDetail = async (req, res) => {
   const { expenseId } = req.params;
 
   try {
+    // Retrieve the Expense from the database
+    const expense = await Expense.findById(expenseId);
+    if (!expense) {
+      return res.status(404).json({ error: "Expense not found" });
+    }
+
+    const paymentIntentId = expense.paymentIntentId;
+
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: "PaymentIntentId not found in expense." });
+    }
+
     // Retrieve the PaymentIntent from Stripe
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentId);
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     if (!paymentIntent) {
       return res.status(404).json({ error: "PaymentIntent not found" });
     }
@@ -307,4 +320,61 @@ const fetchPaymentHistory = async (expense) => {
     amountPaid: charge.amount / 100, // Convert from cents to currency units
     date: new Date(charge.created * 1000),
   }));
+};
+
+// Function to store data on IPFS and blockchain via Pinata
+exports.storeData = async (req, res) => {
+  try {
+    const { data } = req.body;
+
+    if (!data) {
+      return res.status(400).json({ message: 'Data is required.' });
+    }
+
+    // Pin data to IPFS via Pinata
+    const pinataApiKey = process.env.PINATA_API_KEY;
+    const pinataSecretApiKey = process.env.PINATA_SECRET_API_KEY;
+
+    if (!pinataApiKey || !pinataSecretApiKey) {
+      return res.status(500).json({ message: 'Pinata API credentials are not set.' });
+    }
+
+    const response = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', data, {
+      headers: {
+        'Content-Type': 'application/json',
+        'pinata_api_key': pinataApiKey,
+        'pinata_secret_api_key': pinataSecretApiKey,
+      },
+    });
+
+    const ipfsHash = response.data.IpfsHash;
+    console.log('Data pinned to IPFS with CID:', ipfsHash);
+
+    // Store the IPFS hash on the blockchain
+    const tx = {
+      to: wallet.address, // Sending to self; can be any address
+      value: ethers.utils.parseEther('0.0'), // Sending 0 Ether
+      data: ethers.utils.hexlify(ethers.utils.toUtf8Bytes(ipfsHash)),
+      gasLimit: 100000, // Adjust gas limit as needed
+    };
+
+    // Estimate gas price
+    const gasPrice = await provider.getGasPrice();
+    tx.gasPrice = gasPrice;
+
+    // Send the transaction
+    const transactionResponse = await wallet.sendTransaction(tx);
+    await transactionResponse.wait();
+
+    console.log('IPFS hash stored on blockchain with tx hash:', transactionResponse.hash);
+
+    res.status(200).json({
+      message: 'Data stored on IPFS and blockchain successfully.',
+      ipfsHash,
+      transactionHash: transactionResponse.hash,
+    });
+  } catch (error) {
+    console.error('Error storing data:', error.response?.data || error.message);
+    res.status(500).json({ message: 'Failed to store data.', error: error.response?.data || error.message });
+  }
 };
