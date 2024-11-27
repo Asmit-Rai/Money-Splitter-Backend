@@ -50,6 +50,8 @@ const expenseSchema = new mongoose.Schema({
         ref: 'Group', 
         required: true 
     },
+    ipfsHash: { type: String },
+    transactionHash: { type: String },
     createdAt: { type: Date, default: Date.now }
 });
 

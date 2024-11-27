@@ -1,9 +1,12 @@
+// controllers/expenseController.js
+
 const Expense = require("../models/Expense");
 const Group = require("../models/Group");
 const User = require("../models/User");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
+// Add Expense
 exports.addExpense = async (req, res) => {
   try {
     const { expenseName, amount, payer, participants, groupId } = req.body;
@@ -45,18 +48,20 @@ exports.addExpense = async (req, res) => {
     const formattedParticipants = participants.map((userId) => ({
       user: userId, // Ensure userId is passed as ObjectId
       hasPaid: false, // Default to false
+      amountPaid: 0, // Initialize amountPaid
     }));
 
     // Create a new expense
-    // When creating a new expense with paymentIntentId
     const newExpense = new Expense({
       expenseName,
       amount,
       payer,
       participants: formattedParticipants,
       group: groupId,
-      paymentIntentId, // Ensure this field is included
-      splitDetails,
+      paymentIntentId: req.body.paymentIntentId || null,
+      splitDetails: req.body.splitDetails || [],
+      ipfsHash: req.body.ipfsHash || null,
+      transactionHash: req.body.transactionHash || null,
     });
 
     // Save the expense to the database
@@ -87,6 +92,7 @@ exports.addExpense = async (req, res) => {
   }
 };
 
+// Confirm Payment and Add Expense
 exports.confirmPaymentAndAddExpense = async (req, res) => {
   try {
     const {
@@ -97,6 +103,8 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       groupId,
       paymentIntentId,
       splitDetails,
+      ipfsHash,
+      transactionHash,
     } = req.body;
 
     console.log("Received request:", req.body);
@@ -125,7 +133,7 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       amountPaid: 0,
     }));
 
-    // Create a new expense with splitDetails
+    // Create a new expense with splitDetails and IPFS info
     const newExpense = new Expense({
       expenseName,
       amount,
@@ -133,6 +141,9 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       participants: formattedParticipants,
       group: groupId,
       splitDetails,
+      ipfsHash, // Store IPFS hash
+      transactionHash, // Store blockchain transaction hash
+      paymentIntentId, // Store PaymentIntentId
     });
 
     // Save the expense and populate references
@@ -168,6 +179,7 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
   }
 };
 
+// Get All Expenses
 exports.getData = async (req, res) => {
   try {
     // Fetch all expenses from the database
@@ -187,13 +199,13 @@ exports.getData = async (req, res) => {
   }
 };
 
+// Get Expense Detail
 exports.getExpenseDetail = async (req, res) => {
   const { expenseId } = req.params;
 
   try {
     // Retrieve the PaymentIntent from Stripe
-    const paymentIntent = await stripe.paymentIntents.retrieve(expenseId);
-
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentId);
     if (!paymentIntent) {
       return res.status(404).json({ error: "PaymentIntent not found" });
     }
@@ -220,6 +232,7 @@ exports.getExpenseDetail = async (req, res) => {
   }
 };
 
+// Delete Expense
 exports.deleteExpense = async (req, res) => {
   const { expenseId } = req.params;
 
@@ -256,7 +269,7 @@ exports.deleteExpense = async (req, res) => {
   }
 };
 
-// In your expenseController.js
+// Get Expense By ID
 exports.getExpenseById = async (req, res) => {
   const { expenseId } = req.params;
 
@@ -277,42 +290,6 @@ exports.getExpenseById = async (req, res) => {
   } catch (error) {
     console.error("Error fetching expense:", error.message);
     res.status(500).json({ message: "Server error." });
-  }
-};
-
-exports.deleteExpense = async (req, res) => {
-  const { expenseId } = req.params;
-
-  try {
-    const expense = await Expense.findById(expenseId);
-    if (!expense) {
-      return res.status(404).json({ message: "Expense not found" });
-    }
-
-    // Remove the expense from the participants' expenses array
-    for (const participant of expense.participants) {
-      await User.findByIdAndUpdate(participant.user, {
-        $pull: { expenses: expenseId },
-      });
-    }
-
-    // Remove the expense from the payer's expenses array
-    await User.findByIdAndUpdate(expense.payer, {
-      $pull: { expenses: expenseId },
-    });
-
-    // Delete the expense
-    await Expense.findByIdAndDelete(expenseId);
-
-    res.status(200).json({ message: "Expense deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting expense:", error.message);
-    res
-      .status(500)
-      .json({
-        message: "Server error. Please try again later.",
-        error: error.message,
-      });
   }
 };
 
