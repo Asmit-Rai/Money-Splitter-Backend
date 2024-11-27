@@ -262,12 +262,12 @@ exports.getExpenseById = async (req, res) => {
 
   try {
     const expense = await Expense.findById(expenseId)
-      .populate('payer', 'name')
-      .populate('participants.user', 'name')
+      .populate("payer", "name")
+      .populate("participants.user", "name")
       .lean();
 
     if (!expense) {
-      return res.status(404).json({ message: 'Expense not found.' });
+      return res.status(404).json({ message: "Expense not found." });
     }
 
     // Include payment history if available
@@ -275,10 +275,11 @@ exports.getExpenseById = async (req, res) => {
 
     res.status(200).json({ expense });
   } catch (error) {
-    console.error('Error fetching expense:', error.message);
-    res.status(500).json({ message: 'Server error.' });
+    console.error("Error fetching expense:", error.message);
+    res.status(500).json({ message: "Server error." });
   }
 };
+
 exports.deleteExpense = async (req, res) => {
   const { expenseId } = req.params;
 
@@ -320,18 +321,13 @@ const fetchPaymentHistory = async (expense) => {
   const paymentIntentId = expense.paymentIntentId;
   if (!paymentIntentId) return [];
 
-  try {
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    const charges = paymentIntent.charges.data;
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  const charges = paymentIntent.charges.data;
 
-    return charges.map((charge) => ({
-      participantName: charge.billing_details.name || 'Unknown',
-      status: charge.status,
-      amountPaid: charge.amount / 100, // Convert from cents to currency units
-      date: new Date(charge.created * 1000),
-    }));
-  } catch (error) {
-    console.error('Error fetching payment history:', error.message);
-    return [];
-  }
+  return charges.map((charge) => ({
+    participantName: charge.billing_details.name || "Unknown",
+    status: charge.status,
+    amountPaid: charge.amount / 100, // Convert from cents to currency units
+    date: new Date(charge.created * 1000),
+  }));
 };
