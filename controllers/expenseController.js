@@ -5,10 +5,6 @@ const Group = require("../models/Group");
 const User = require("../models/User");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const axios = require('axios'); // Import Axios
-
-// Add Expense
-// controllers/expenseController.js
 
 // Add Expense
 exports.addExpense = async (req, res) => {
@@ -48,29 +44,8 @@ exports.addExpense = async (req, res) => {
         .json({ message: `Group with ID "${groupId}" not found.` });
     }
 
-    // Verify that payer exists
-    const payerUser = await User.findById(payer);
-    if (!payerUser) {
-      return res.status(400).json({
-        message: "Payer user not found.",
-      });
-    }
-
-    // Verify that each participant exists
-    const verifiedParticipants = [];
-    for (const userId of participants) {
-      const user = await User.findById(userId);
-      if (!user) {
-        console.warn(`Participant user with ID ${userId} not found.`);
-        return res.status(400).json({
-          message: `Participant user with ID ${userId} not found.`,
-        });
-      }
-      verifiedParticipants.push(userId);
-    }
-
     // Format participants
-    const formattedParticipants = verifiedParticipants.map((userId) => ({
+    const formattedParticipants = participants.map((userId) => ({
       user: userId, // Ensure userId is passed as ObjectId
       hasPaid: false, // Default to false
       amountPaid: 0, // Initialize amountPaid
@@ -98,7 +73,7 @@ exports.addExpense = async (req, res) => {
     });
 
     // Update each participant's expenses array
-    for (const participant of verifiedParticipants) {
+    for (const participant of participants) {
       await User.findByIdAndUpdate(participant, {
         $push: { expenses: savedExpense._id },
       });
@@ -151,30 +126,8 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
 
     console.log("PaymentIntent verified:", paymentIntent);
 
-    // Verify that payer exists
-    const payerUser = await User.findById(payer);
-    if (!payerUser) {
-      return res.status(400).json({
-        message: "Payer user not found.",
-      });
-    }
-
-    // Verify that each participant exists
-    const verifiedParticipants = [];
-    for (const userId of participants) {
-      const user = await User.findById(userId);
-      if (!user) {
-        console.warn(`Participant user with ID ${userId} not found.`);
-        // Optionally, you can skip adding this participant or return an error
-        return res.status(400).json({
-          message: `Participant user with ID ${userId} not found.`,
-        });
-      }
-      verifiedParticipants.push(userId);
-    }
-
     // Prepare participants array
-    const formattedParticipants = verifiedParticipants.map((userId) => ({
+    const formattedParticipants = participants.map((userId) => ({
       user: userId,
       hasPaid: false,
       amountPaid: 0,
@@ -202,7 +155,7 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
     });
 
     // Update each participant's expenses array
-    for (const participant of verifiedParticipants) {
+    for (const participant of participants) {
       await User.findByIdAndUpdate(participant, {
         $push: { expenses: savedExpense._id },
       });
@@ -247,6 +200,7 @@ exports.getData = async (req, res) => {
 };
 
 // Get Expense Detail
+// Get Expense Detail
 exports.getExpenseDetail = async (req, res) => {
   const { expenseId } = req.params;
 
@@ -290,6 +244,7 @@ exports.getExpenseDetail = async (req, res) => {
     });
   }
 };
+
 
 // Delete Expense
 exports.deleteExpense = async (req, res) => {
@@ -352,6 +307,7 @@ exports.getExpenseById = async (req, res) => {
   }
 };
 
+// Helper function to fetch payment history
 const fetchPaymentHistory = async (expense) => {
   const paymentIntentId = expense.paymentIntentId;
   if (!paymentIntentId) return [];
@@ -367,13 +323,12 @@ const fetchPaymentHistory = async (expense) => {
   }));
 };
 
-// Function to store data on IPFS and blockchain via Pinata
-exports.storeData = async (req, res, wallet, provider) => {
+
+exports.storeData = async (req, res) => {
   try {
     const { data } = req.body;
 
     if (!data) {
-      console.warn('No data provided in request.');
       return res.status(400).json({ message: 'Data is required.' });
     }
 
@@ -382,11 +337,9 @@ exports.storeData = async (req, res, wallet, provider) => {
     const pinataSecretApiKey = process.env.PINATA_SECRET_API_KEY;
 
     if (!pinataApiKey || !pinataSecretApiKey) {
-      console.warn('Pinata API credentials are missing.');
       return res.status(500).json({ message: 'Pinata API credentials are not set.' });
     }
 
-    console.log('Pinning data to IPFS via Pinata...');
     const response = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', data, {
       headers: {
         'Content-Type': 'application/json',
@@ -395,16 +348,10 @@ exports.storeData = async (req, res, wallet, provider) => {
       },
     });
 
-    if (!response.data || !response.data.IpfsHash) {
-      console.error('Invalid response from Pinata:', response.data);
-      return res.status(500).json({ message: 'Failed to pin data to IPFS.' });
-    }
-
     const ipfsHash = response.data.IpfsHash;
     console.log('Data pinned to IPFS with CID:', ipfsHash);
 
     // Store the IPFS hash on the blockchain
-    console.log('Storing IPFS hash on the blockchain...');
     const tx = {
       to: wallet.address, // Sending to self; can be any address
       value: ethers.utils.parseEther('0.0'), // Sending 0 Ether
