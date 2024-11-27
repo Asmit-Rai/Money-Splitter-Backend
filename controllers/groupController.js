@@ -11,13 +11,14 @@ exports.addGroup = async (req, res) => {
   }
 
   try {
-    // Find the user by email
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found.' });
+    console.log('Searching for creator with email:', email); // Debug log
+    const creator = await User.findOne({ email });
+    if (!creator) {
+      console.warn('Creator not found for email:', email); // Debug log
+      return res.status(404).json({ error: 'Creator not found.' });
     }
 
-    // Create the group
+    // Create the new group
     const newGroup = new Group({
       groupName,
       participants: participants.map((p) => ({ name: p.name, email: p.email })),
@@ -25,11 +26,32 @@ exports.addGroup = async (req, res) => {
 
     const savedGroup = await newGroup.save();
 
-    // Associate the group with the user
-    user.groups.push(savedGroup._id);
-    await user.save(); // Save the updated user
+    // Add the group to the creator's user record
+    if (!creator.groups.includes(savedGroup._id)) {
+      creator.groups.push(savedGroup._id);
+      await creator.save();
+    }
 
-    return res.status(201).json({ message: 'Group created successfully', group: savedGroup });
+    // Handle participants
+    const nonExistentEmails = [];
+    for (const participant of participants) {
+      const user = await User.findOne({ email: participant.email });
+      if (user) {
+        if (!user.groups.includes(savedGroup._id)) {
+          user.groups.push(savedGroup._id);
+          await user.save(); // Save updated user record
+        }
+      } else {
+        nonExistentEmails.push(participant.email);
+      }
+    }
+
+    // Return success response
+    return res.status(201).json({
+      message: 'Group created successfully',
+      group: savedGroup,
+      nonExistentEmails,
+    });
   } catch (error) {
     console.error('Error saving group:', error.message);
     return res.status(500).json({ message: 'Error saving group', error: error.message });
@@ -37,26 +59,26 @@ exports.addGroup = async (req, res) => {
 };
 
 
-// Fetch all groups
 exports.getData = async (req, res) => {
   const { email } = req.query;
 
   if (!email) {
-    return res.status(400).json({ message: "Email is required to fetch groups." });
+    return res.status(400).json({ message: 'Email is required to fetch groups.' });
   }
 
   try {
-    const user = await User.findOne({ email }).populate("groups");
+    const user = await User.findOne({ email }).populate('groups');
     if (!user) {
-      return res.status(404).json({ message: "User not found." });
+      return res.status(404).json({ message: 'User not found.' });
     }
 
     res.status(200).json(user.groups);
   } catch (error) {
-    console.error("Error fetching groups:", error.message);
-    res.status(500).json({ message: "Error fetching groups", error: error.message });
+    console.error('Error fetching groups:', error.message);
+    res.status(500).json({ message: 'Error fetching groups', error: error.message });
   }
 };
+
 
 
 
@@ -102,4 +124,4 @@ exports.getId =  async (req, res) => {
     console.error('Error fetching group:', error);
     res.status(500).json({ message: 'Server error' });
   }
-};
+}
