@@ -324,12 +324,18 @@ const fetchPaymentHistory = async (expense) => {
 };
 
 
-exports.storeData = async (req, res) => {
+exports.storeData = async (req, res, wallet, provider) => {
   try {
     const { data } = req.body;
 
     if (!data) {
       return res.status(400).json({ message: 'Data is required.' });
+    }
+
+    // Check wallet balance
+    const balance = await wallet.getBalance();
+    if (balance.isZero()) {
+      return res.status(400).json({ message: 'Insufficient wallet balance for transaction.' });
     }
 
     // Pin data to IPFS via Pinata
@@ -353,29 +359,28 @@ exports.storeData = async (req, res) => {
 
     // Store the IPFS hash on the blockchain
     const tx = {
-      to: wallet.address, // Sending to self; can be any address
+      to: wallet.address, // Sending to self or a specific address if required
       value: ethers.utils.parseEther('0.0'), // Sending 0 Ether
       data: ethers.utils.hexlify(ethers.utils.toUtf8Bytes(ipfsHash)),
-      gasLimit: 100000, // Adjust gas limit as needed
+      gasLimit: 100000,
     };
 
     // Estimate gas price
     const gasPrice = await provider.getGasPrice();
     tx.gasPrice = gasPrice;
 
-    // Send the transaction
     const transactionResponse = await wallet.sendTransaction(tx);
-    await transactionResponse.wait();
+    const receipt = await transactionResponse.wait();
 
-    console.log('IPFS hash stored on blockchain with tx hash:', transactionResponse.hash);
+    console.log('IPFS hash stored on blockchain with tx hash:', receipt.transactionHash);
 
     res.status(200).json({
       message: 'Data stored on IPFS and blockchain successfully.',
       ipfsHash,
-      transactionHash: transactionResponse.hash,
+      transactionHash: receipt.transactionHash,
     });
   } catch (error) {
-    console.error('Error storing data:', error.response?.data || error.message);
-    res.status(500).json({ message: 'Failed to store data.', error: error.response?.data || error.message });
+    console.error('Error storing data:', error.message);
+    res.status(500).json({ message: 'Failed to store data.', error: error.message });
   }
 };

@@ -28,13 +28,30 @@ app.use('/api/expenses', expenseRoutes);
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Initialize Ethereum provider using Alchemy
-const provider = new ethers.providers.JsonRpcProvider(`https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`);
+const provider = new ethers.providers.JsonRpcProvider(
+  `https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`
+);
 
 // Create a wallet instance
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
+// Pass wallet and provider to storeData
+const expenseController = require('./controllers/expenseController');
+app.post('/store-data', (req, res) => expenseController.storeData(req, res, wallet, provider));
+
+
 // Initialize IPFS client using a public gateway (no longer used for pinning)
-const ipfs = create({ url: 'https://ipfs.io' }); // Retain if needed elsewhere
+const ipfs = create({ url: 'https://ipfs.io' }); 
+
+
+
+
+
+
+
+
+
+
 
 // Existing /payment-sheet endpoint
 app.post('/payment-sheet', async (req, res) => {
@@ -73,11 +90,6 @@ app.post('/payment-sheet', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// API endpoint to store data on IPFS and blockchain via Pinata
-const expenseController = require('./controllers/expenseController'); // Ensure correct path
-
-app.post('/store-data', expenseController.storeData);
 
 // Start the server
 app.listen(port, () => {
