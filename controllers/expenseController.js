@@ -324,6 +324,12 @@ const fetchPaymentHistory = async (expense) => {
 };
 
 
+// controllers/expenseController.js
+
+// controllers/expenseController.js
+
+const pinataSDK = require('@pinata/sdk');
+
 exports.storeData = async (req, res, wallet, provider) => {
   try {
     const { data } = req.body;
@@ -338,24 +344,22 @@ exports.storeData = async (req, res, wallet, provider) => {
       return res.status(400).json({ message: 'Insufficient wallet balance for transaction.' });
     }
 
-    // Pin data to IPFS via Pinata
-    const pinataApiKey = process.env.PINATA_API_KEY;
-    const pinataSecretApiKey = process.env.PINATA_SECRET_API_KEY;
+    // Initialize Pinata SDK
+    const pinata = pinataSDK(process.env.PINATA_API_KEY, process.env.PINATA_SECRET_API_KEY);
 
-    if (!pinataApiKey || !pinataSecretApiKey) {
-      return res.status(500).json({ message: 'Pinata API credentials are not set.' });
+    // Pin JSON to IPFS
+    let ipfsHash;
+    try {
+      const result = await pinata.pinJSONToIPFS(data);
+      ipfsHash = result.IpfsHash;
+      console.log('Data pinned to IPFS with CID:', ipfsHash);
+    } catch (pinataError) {
+      console.error('Pinata SDK Error:', pinataError);
+      return res.status(500).json({
+        message: 'Failed to pin data to IPFS.',
+        error: pinataError.message,
+      });
     }
-
-    const response = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', data, {
-      headers: {
-        'Content-Type': 'application/json',
-        'pinata_api_key': pinataApiKey,
-        'pinata_secret_api_key': pinataSecretApiKey,
-      },
-    });
-
-    const ipfsHash = response.data.IpfsHash;
-    console.log('Data pinned to IPFS with CID:', ipfsHash);
 
     // Store the IPFS hash on the blockchain
     const tx = {
@@ -380,7 +384,7 @@ exports.storeData = async (req, res, wallet, provider) => {
       transactionHash: receipt.transactionHash,
     });
   } catch (error) {
-    console.error('Error storing data:', error.message);
+    console.error('Error storing data:', error);
     res.status(500).json({ message: 'Failed to store data.', error: error.message });
   }
 };
