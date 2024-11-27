@@ -5,6 +5,7 @@ const Group = require("../models/Group");
 const User = require("../models/User");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const axios = require('axios'); // Add this line to import Axios
 
 // Add Expense
 exports.addExpense = async (req, res) => {
@@ -199,7 +200,6 @@ exports.getData = async (req, res) => {
   }
 };
 
-// Get Expense Detail
 // Get Expense Detail
 exports.getExpenseDetail = async (req, res) => {
   const { expenseId } = req.params;

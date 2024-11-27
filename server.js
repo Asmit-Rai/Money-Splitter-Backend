@@ -39,19 +39,8 @@ const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const expenseController = require('./controllers/expenseController');
 app.post('/store-data', (req, res) => expenseController.storeData(req, res, wallet, provider));
 
-
 // Initialize IPFS client using a public gateway (no longer used for pinning)
 const ipfs = create({ url: 'https://ipfs.io' }); 
-
-
-
-
-
-
-
-
-
-
 
 // Existing /payment-sheet endpoint
 app.post('/payment-sheet', async (req, res) => {
