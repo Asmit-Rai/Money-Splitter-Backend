@@ -5,11 +5,10 @@ const Group = require("../models/Group");
 const User = require("../models/User");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const pinataSDK = require('@pinata/sdk'); // Import Pinata SDK correctly
+const axios = require('axios'); // Add this line to import Axios
+const pinataApiKey = process.env.PINATA_API_KEY;
+const pinataSecretApiKey = process.env.PINATA_SECRET_API_KEY;
 const ethers = require('ethers');
-
-// Initialize Pinata SDK
-const pinata = pinataSDK(process.env.PINATA_API_KEY, process.env.PINATA_SECRET_API_KEY);
 
 // Add Expense
 exports.addExpense = async (req, res) => {
@@ -184,80 +183,205 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
   }
 };
 
-// Store Data on IPFS and Blockchain
-exports.storeData = async (req, res, wallet, provider) => {
+// Get All Expenses
+exports.getData = async (req, res) => {
   try {
-    const { data } = req.body;
+    // Fetch all expenses from the database
+    const expenses = await Expense.find();
 
-    if (!data) {
-      return res.status(400).json({ message: 'Data is required.' });
-    }
-
-    // Check wallet balance
-    const balance = await wallet.getBalance();
-    console.log(`Wallet balance: ${ethers.utils.formatEther(balance)} ETH`);
-    if (balance.isZero()) {
-      return res.status(400).json({ message: 'Insufficient wallet balance for transaction.' });
-    }
-
-    // Pin JSON to IPFS using Pinata SDK
-    let pinataResult;
-    try {
-      pinataResult = await pinata.pinJSONToIPFS(data);
-      console.log('Data pinned to IPFS with CID:', pinataResult.IpfsHash);
-    } catch (pinataError) {
-      console.error('Pinata SDK Error:', pinataError);
-      return res.status(500).json({
-        message: 'Failed to pin data to IPFS.',
-        error: pinataError.message,
-      });
-    }
-
-    const ipfsHash = pinataResult.IpfsHash;
-
-    // Store the IPFS hash on the blockchain
-    const tx = {
-      to: wallet.address, // Sending to self; modify if needed
-      value: ethers.utils.parseEther('0.0'), // Sending 0 Ether
-      data: ethers.utils.hexlify(ethers.utils.toUtf8Bytes(ipfsHash)),
-      gasLimit: 100000, // Adjust gas limit as needed
-    };
-
-    // Estimate gas price
-    const gasPrice = await provider.getGasPrice();
-    tx.gasPrice = gasPrice;
-
-    let transactionResponse;
-    try {
-      transactionResponse = await wallet.sendTransaction(tx);
-      console.log('Transaction sent:', transactionResponse.hash);
-    } catch (txError) {
-      console.error('Blockchain Transaction Error:', txError);
-      return res.status(500).json({
-        message: 'Failed to send transaction to blockchain.',
-        error: txError.message,
-      });
-    }
-
-    let receipt;
-    try {
-      receipt = await transactionResponse.wait();
-      console.log('Transaction mined:', receipt.transactionHash);
-    } catch (receiptError) {
-      console.error('Transaction Receipt Error:', receiptError);
-      return res.status(500).json({
-        message: 'Failed to retrieve transaction receipt.',
-        error: receiptError.message,
-      });
-    }
-
+    // Respond with the data
     res.status(200).json({
-      message: 'Data stored on IPFS and blockchain successfully.',
-      ipfsHash,
-      transactionHash: receipt.transactionHash,
+      success: true,
+      expenses,
     });
   } catch (error) {
-    console.error('Error in storeData:', error);
-    res.status(500).json({ message: 'Failed to store data.', error: error.message });
+    console.error("Error fetching data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch data",
+    });
+  }
+};
+
+// Get Expense Detail
+exports.getExpenseDetail = async (req, res) => {
+  const { expenseId } = req.params;
+
+  try {
+    // Retrieve the Expense from the database
+    const expense = await Expense.findById(expenseId);
+    if (!expense) {
+      return res.status(404).json({ error: "Expense not found" });
+    }
+
+    const paymentIntentId = expense.paymentIntentId;
+
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: "PaymentIntentId not found in expense." });
+    }
+
+    // Retrieve the PaymentIntent from Stripe
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (!paymentIntent) {
+      return res.status(404).json({ error: "PaymentIntent not found" });
+    }
+
+    const charges = paymentIntent.charges.data || [];
+    const paymentStatus = charges.map((charge) => ({
+      participant: charge.billing_details.name || "Unknown",
+      status: charge.status,
+      amountPaid: charge.amount / 100, // Convert from smallest currency unit
+    }));
+
+    // Extract split details from metadata if available
+    const splitDetails = paymentIntent.metadata?.splitDetails
+      ? JSON.parse(paymentIntent.metadata.splitDetails)
+      : [];
+
+    res.json({ paymentStatus, splitDetails });
+  } catch (error) {
+    console.error("Error fetching expense details:", error.message);
+    res.status(500).json({
+      error: "Failed to retrieve expense details",
+      details: error.message,
+    });
+  }
+};
+
+
+// Delete Expense
+exports.deleteExpense = async (req, res) => {
+  const { expenseId } = req.params;
+
+  try {
+    const expense = await Expense.findById(expenseId);
+    if (!expense) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
+
+    // Remove the expense from the participants' expenses array
+    for (const participant of expense.participants) {
+      await User.findByIdAndUpdate(participant.user, {
+        $pull: { expenses: expenseId },
+      });
+    }
+
+    // Remove the expense from the payer's expenses array
+    await User.findByIdAndUpdate(expense.payer, {
+      $pull: { expenses: expenseId },
+    });
+
+    // Delete the expense
+    await Expense.findByIdAndDelete(expenseId);
+
+    res.status(200).json({ message: "Expense deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting expense:", error.message);
+    res
+      .status(500)
+      .json({
+        message: "Server error. Please try again later.",
+        error: error.message,
+      });
+  }
+};
+
+// Get Expense By ID
+exports.getExpenseById = async (req, res) => {
+  const { expenseId } = req.params;
+
+  try {
+    const expense = await Expense.findById(expenseId)
+      .populate("payer", "name")
+      .populate("participants.user", "name")
+      .lean();
+
+    if (!expense) {
+      return res.status(404).json({ message: "Expense not found." });
+    }
+
+    // Include payment history if available
+    expense.paymentHistory = await fetchPaymentHistory(expense);
+
+    res.status(200).json({ expense });
+  } catch (error) {
+    console.error("Error fetching expense:", error.message);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
+// Helper function to fetch payment history
+const fetchPaymentHistory = async (expense) => {
+  const paymentIntentId = expense.paymentIntentId;
+  if (!paymentIntentId) return [];
+
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  const charges = paymentIntent.charges.data;
+
+  return charges.map((charge) => ({
+    participantName: charge.billing_details.name || "Unknown",
+    status: charge.status,
+    amountPaid: charge.amount / 100, // Convert from cents to currency units
+    date: new Date(charge.created * 1000),
+  }));
+};
+
+
+// controllers/expenseController.js
+
+// controllers/expenseController.js
+
+// controllers/expenseController.js
+
+
+
+exports.storeData = async (req, res, wallet, provider) => {
+  try {
+    const data = req.body;
+
+    // Pin data to IPFS using Pinata
+    const response = await axios.post(
+      'https://api.pinata.cloud/pinning/pinJSONToIPFS',
+      {
+        pinataContent: data,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          pinata_api_key: pinataApiKey,
+          pinata_secret_api_key: pinataSecretApiKey,
+        },
+      }
+    );
+
+    const ipfsHash = response.data.IpfsHash;
+    console.log('Data pinned to IPFS with hash:', ipfsHash);
+
+    // Interact with Ethereum blockchain
+    // Replace with your smart contract ABI and address
+    const contractABI = [/* Your Contract ABI */];
+    const contractAddress = 'YOUR_CONTRACT_ADDRESS';
+
+    const contract = new ethers.Contract(contractAddress, contractABI, wallet);
+
+    // Assume your contract has a function to store the IPFS hash
+    const tx = await contract.storeExpense(ipfsHash);
+    await tx.wait();
+    console.log('Data stored on blockchain with transaction hash:', tx.hash);
+
+    res.status(200).json({
+      message: 'Data stored successfully.',
+      ipfsHash: ipfsHash,
+      transactionHash: tx.hash,
+    });
+  } catch (error) {
+    console.error(
+      'Error storing data:',
+      error.response ? error.response.data : error.message
+    );
+    res.status(500).json({
+      message: 'Failed to store data.',
+      error: error.message,
+    });
   }
 };
