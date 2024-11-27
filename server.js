@@ -1,5 +1,3 @@
-// server.js
-
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -10,7 +8,7 @@ const expenseRoutes = require('./routes/expenseRoutes');
 
 require('dotenv').config(); // Load environment variables
 const { ethers } = require('ethers'); // Import ethers
-const IPFS = require('ipfs-http-client'); // Import IPFS client
+const { create } = require('ipfs-http-client'); //
 
 const app = express();
 const port = process.env.PORT || 5000;
