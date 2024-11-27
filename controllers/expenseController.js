@@ -1,14 +1,16 @@
 // controllers/expenseController.js
 
+
 const Expense = require("../models/Expense");
 const Group = require("../models/Group");
 const User = require("../models/User");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const axios = require('axios'); // Add this line to import Axios
-const pinataApiKey = process.env.PINATA_API_KEY;
-const pinataSecretApiKey = process.env.PINATA_SECRET_API_KEY;
+const pinataSDK = require('@pinata/sdk');
 const ethers = require('ethers');
+
+// Initialize Pinata SDK
+const pinata = pinataSDK(process.env.PINATA_API_KEY, process.env.PINATA_SECRET_API_KEY);
 
 // Add Expense
 exports.addExpense = async (req, res) => {
@@ -328,10 +330,6 @@ const fetchPaymentHistory = async (expense) => {
 
 
 // controllers/expenseController.js
-
-const pinataSDK = require('@pinata/sdk');
-const pinata = pinataSDK(process.env.PINATA_API_KEY, process.env.PINATA_SECRET_API_KEY);
-
 exports.storeData = async (req, res, wallet, provider) => {
   try {
     const { data } = req.body;
@@ -342,14 +340,16 @@ exports.storeData = async (req, res, wallet, provider) => {
 
     // Check wallet balance
     const balance = await wallet.getBalance();
+    console.log(`Wallet balance: ${ethers.utils.formatEther(balance)} ETH`);
     if (balance.isZero()) {
       return res.status(400).json({ message: 'Insufficient wallet balance for transaction.' });
     }
 
     // Pin JSON to IPFS using Pinata SDK
-    let result;
+    let pinataResult;
     try {
-      result = await pinata.pinJSONToIPFS(data);
+      pinataResult = await pinata.pinJSONToIPFS(data);
+      console.log('Data pinned to IPFS with CID:', pinataResult.IpfsHash);
     } catch (pinataError) {
       console.error('Pinata SDK Error:', pinataError);
       return res.status(500).json({
@@ -358,25 +358,43 @@ exports.storeData = async (req, res, wallet, provider) => {
       });
     }
 
-    const ipfsHash = result.IpfsHash;
-    console.log('Data pinned to IPFS with CID:', ipfsHash);
+    const ipfsHash = pinataResult.IpfsHash;
 
     // Store the IPFS hash on the blockchain
     const tx = {
-      to: wallet.address, // Sending to self or a specific address if required
+      to: wallet.address, // Sending to self; modify if needed
       value: ethers.utils.parseEther('0.0'), // Sending 0 Ether
       data: ethers.utils.hexlify(ethers.utils.toUtf8Bytes(ipfsHash)),
-      gasLimit: 100000,
+      gasLimit: 100000, // Adjust gas limit as needed
     };
 
     // Estimate gas price
     const gasPrice = await provider.getGasPrice();
     tx.gasPrice = gasPrice;
 
-    const transactionResponse = await wallet.sendTransaction(tx);
-    const receipt = await transactionResponse.wait();
+    let transactionResponse;
+    try {
+      transactionResponse = await wallet.sendTransaction(tx);
+      console.log('Transaction sent:', transactionResponse.hash);
+    } catch (txError) {
+      console.error('Blockchain Transaction Error:', txError);
+      return res.status(500).json({
+        message: 'Failed to send transaction to blockchain.',
+        error: txError.message,
+      });
+    }
 
-    console.log('IPFS hash stored on blockchain with tx hash:', receipt.transactionHash);
+    let receipt;
+    try {
+      receipt = await transactionResponse.wait();
+      console.log('Transaction mined:', receipt.transactionHash);
+    } catch (receiptError) {
+      console.error('Transaction Receipt Error:', receiptError);
+      return res.status(500).json({
+        message: 'Failed to retrieve transaction receipt.',
+        error: receiptError.message,
+      });
+    }
 
     res.status(200).json({
       message: 'Data stored on IPFS and blockchain successfully.',
@@ -384,7 +402,7 @@ exports.storeData = async (req, res, wallet, provider) => {
       transactionHash: receipt.transactionHash,
     });
   } catch (error) {
-    console.error('Error storing data:', error);
+    console.error('Error in storeData:', error);
     res.status(500).json({ message: 'Failed to store data.', error: error.message });
   }
 };
