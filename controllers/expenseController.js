@@ -230,3 +230,70 @@ exports.deleteExpense = async (req, res) => {
     res.status(500).json({ message: 'Server error. Please try again later.', error: error.message });
   }
 }
+
+// In your expenseController.js
+exports.getExpenseById = async (req, res) => {
+  const { expenseId } = req.params;
+
+  try {
+    const expense = await Expense.findById(expenseId)
+      .populate('payer', 'name')
+      .populate('participants.user', 'name')
+      .lean();
+
+    if (!expense) {
+      return res.status(404).json({ message: 'Expense not found.' });
+    }
+
+    // Include payment history if available
+    expense.paymentHistory = await fetchPaymentHistory(expense);
+
+    res.status(200).json({ expense });
+  } catch (error) {
+    console.error('Error fetching expense:', error.message);
+    res.status(500).json({ message: 'Server error.' });
+  }
+};
+
+exports.deleteExpense = async (req, res) => {
+  const { expenseId } = req.params;
+
+  try {
+    const expense = await Expense.findById(expenseId);
+    if (!expense) {
+      return res.status(404).json({ message: 'Expense not found' });
+    }
+
+    // Remove the expense from the participants' expenses array
+    for (const participant of expense.participants) {
+      await User.findByIdAndUpdate(participant.user, { $pull: { expenses: expenseId } });
+    }
+
+    // Remove the expense from the payer's expenses array
+    await User.findByIdAndUpdate(expense.payer, { $pull: { expenses: expenseId } });
+
+    // Delete the expense
+    await Expense.findByIdAndDelete(expenseId);
+
+    res.status(200).json({ message: 'Expense deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting expense:', error.message);
+    res.status(500).json({ message: 'Server error. Please try again later.', error: error.message });
+  }
+};
+
+// Helper function to fetch payment history
+const fetchPaymentHistory = async (expense) => {
+  const paymentIntentId = expense.paymentIntentId;
+  if (!paymentIntentId) return [];
+
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  const charges = paymentIntent.charges.data;
+
+  return charges.map((charge) => ({
+    participantName: charge.billing_details.name || 'Unknown',
+    status: charge.status,
+    amountPaid: charge.amount / 100, // Convert from cents to currency units
+    date: new Date(charge.created * 1000),
+  }));
+};
