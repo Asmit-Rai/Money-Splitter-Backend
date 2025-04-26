@@ -19,7 +19,6 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/expenses', expenseRoutes);
 
-<<<<<<< HEAD
 const stripe = require('stripe')('sk_test_51QIsU3EbklFJ2mKnnrzbqAr4bY46VehpMZz1PTGJYnyht0ipOwxX4hWMXCaCMvsVpr5nhBw5kC3plHCKSX2Vobh300gBqd7bPM');
 
 app.post('/payment-sheet', async (req, res) => {
@@ -50,9 +49,6 @@ app.post('/payment-sheet', async (req, res) => {
 
 
 // Start the server
-=======
-// Start server
->>>>>>> 10e87b217b7ff1bf842b2f1316f7bc9ac2c1b6b3
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
