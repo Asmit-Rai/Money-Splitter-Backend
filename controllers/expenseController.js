@@ -1,61 +1,46 @@
-// controllers/expenseController.js
-
 const Expense = require("../models/Expense");
 const Group = require("../models/Group");
 const User = require("../models/User");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const axios = require('axios'); // Add this line to import Axios
+const axios = require('axios');
 const pinataApiKey = process.env.PINATA_API_KEY;
 const pinataSecretApiKey = process.env.PINATA_SECRET_API_KEY;
 const ethers = require('ethers');
 
-// Add Expense
 exports.addExpense = async (req, res) => {
   try {
     const { expenseName, amount, payer, participants, groupId } = req.body;
 
-    // Log incoming data for debugging
     console.log("Received Request Body:", req.body);
 
-    // Validate required fields
     if (!expenseName || !amount || !payer || !participants || !groupId) {
       return res.status(400).json({
-        message:
-          "All fields are required: expenseName, amount, payer, participants, groupId.",
+        message: "All fields are required: expenseName, amount, payer, participants, groupId.",
       });
     }
 
-    // Validate participants as an array
     if (!Array.isArray(participants) || participants.length === 0) {
       return res.status(400).json({
         message: "Participants should be a non-empty array of user IDs.",
       });
     }
 
-    // Validate amount
     if (isNaN(amount) || amount <= 0) {
-      return res
-        .status(400)
-        .json({ message: "Invalid amount. Must be a positive number." });
+      return res.status(400).json({ message: "Invalid amount. Must be a positive number." });
     }
 
-    // Validate group existence
     const groupExists = await Group.findById(groupId);
     if (!groupExists) {
-      return res
-        .status(404)
-        .json({ message: `Group with ID "${groupId}" not found.` });
+      return res.status(404).json({ message: `Group with ID "${groupId}" not found.` });
     }
 
-    // Format participants
     const formattedParticipants = participants.map((userId) => ({
-      user: userId, // Ensure userId is passed as ObjectId
-      hasPaid: false, // Default to false
-      amountPaid: 0, // Initialize amountPaid
+      user: userId,
+      hasPaid: false,
+      amountPaid: 0,
     }));
 
-    // Create a new expense
     const newExpense = new Expense({
       expenseName,
       amount,
@@ -68,15 +53,12 @@ exports.addExpense = async (req, res) => {
       transactionHash: req.body.transactionHash || null,
     });
 
-    // Save the expense to the database
     const savedExpense = await newExpense.save();
 
-    // Update the payer's expenses array
     await User.findByIdAndUpdate(payer, {
       $push: { expenses: savedExpense._id },
     });
 
-    // Update each participant's expenses array
     for (const participant of participants) {
       await User.findByIdAndUpdate(participant, {
         $push: { expenses: savedExpense._id },
@@ -96,7 +78,6 @@ exports.addExpense = async (req, res) => {
   }
 };
 
-// Confirm Payment and Add Expense
 exports.confirmPaymentAndAddExpense = async (req, res) => {
   try {
     const {
@@ -119,7 +100,6 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       });
     }
 
-    // Retrieve the PaymentIntent using the ID
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     if (!paymentIntent || paymentIntent.status !== "succeeded") {
       console.error("Invalid or incomplete payment intent:", paymentIntent);
@@ -130,14 +110,12 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
 
     console.log("PaymentIntent verified:", paymentIntent);
 
-    // Prepare participants array
     const formattedParticipants = participants.map((userId) => ({
       user: userId,
       hasPaid: false,
       amountPaid: 0,
     }));
 
-    // Create a new expense with splitDetails and IPFS info
     const newExpense = new Expense({
       expenseName,
       amount,
@@ -145,20 +123,17 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
       participants: formattedParticipants,
       group: groupId,
       splitDetails,
-      ipfsHash, // Store IPFS hash
-      transactionHash, // Store blockchain transaction hash
-      paymentIntentId, // Store PaymentIntentId
+      ipfsHash,
+      transactionHash,
+      paymentIntentId,
     });
 
-    // Save the expense and populate references
     const savedExpense = await newExpense.save();
 
-    // Update the payer's expenses array
     await User.findByIdAndUpdate(payer, {
       $push: { expenses: savedExpense._id },
     });
 
-    // Update each participant's expenses array
     for (const participant of participants) {
       await User.findByIdAndUpdate(participant, {
         $push: { expenses: savedExpense._id },
@@ -183,13 +158,10 @@ exports.confirmPaymentAndAddExpense = async (req, res) => {
   }
 };
 
-// Get All Expenses
 exports.getData = async (req, res) => {
   try {
-    // Fetch all expenses from the database
     const expenses = await Expense.find();
 
-    // Respond with the data
     res.status(200).json({
       success: true,
       expenses,
@@ -203,12 +175,10 @@ exports.getData = async (req, res) => {
   }
 };
 
-// Get Expense Detail
 exports.getExpenseDetail = async (req, res) => {
   const { expenseId } = req.params;
 
   try {
-    // Retrieve the Expense from the database
     const expense = await Expense.findById(expenseId);
     if (!expense) {
       return res.status(404).json({ error: "Expense not found" });
@@ -220,7 +190,6 @@ exports.getExpenseDetail = async (req, res) => {
       return res.status(400).json({ error: "PaymentIntentId not found in expense." });
     }
 
-    // Retrieve the PaymentIntent from Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     if (!paymentIntent) {
       return res.status(404).json({ error: "PaymentIntent not found" });
@@ -230,10 +199,9 @@ exports.getExpenseDetail = async (req, res) => {
     const paymentStatus = charges.map((charge) => ({
       participant: charge.billing_details.name || "Unknown",
       status: charge.status,
-      amountPaid: charge.amount / 100, // Convert from smallest currency unit
+      amountPaid: charge.amount / 100,
     }));
 
-    // Extract split details from metadata if available
     const splitDetails = paymentIntent.metadata?.splitDetails
       ? JSON.parse(paymentIntent.metadata.splitDetails)
       : [];
@@ -248,8 +216,6 @@ exports.getExpenseDetail = async (req, res) => {
   }
 };
 
-
-// Delete Expense
 exports.deleteExpense = async (req, res) => {
   const { expenseId } = req.params;
 
@@ -259,34 +225,28 @@ exports.deleteExpense = async (req, res) => {
       return res.status(404).json({ message: "Expense not found" });
     }
 
-    // Remove the expense from the participants' expenses array
     for (const participant of expense.participants) {
       await User.findByIdAndUpdate(participant.user, {
         $pull: { expenses: expenseId },
       });
     }
 
-    // Remove the expense from the payer's expenses array
     await User.findByIdAndUpdate(expense.payer, {
       $pull: { expenses: expenseId },
     });
 
-    // Delete the expense
     await Expense.findByIdAndDelete(expenseId);
 
     res.status(200).json({ message: "Expense deleted successfully" });
   } catch (error) {
     console.error("Error deleting expense:", error.message);
-    res
-      .status(500)
-      .json({
-        message: "Server error. Please try again later.",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Server error. Please try again later.",
+      error: error.message,
+    });
   }
 };
 
-// Get Expense By ID
 exports.getExpenseById = async (req, res) => {
   const { expenseId } = req.params;
 
@@ -300,7 +260,6 @@ exports.getExpenseById = async (req, res) => {
       return res.status(404).json({ message: "Expense not found." });
     }
 
-    // Include payment history if available
     expense.paymentHistory = await fetchPaymentHistory(expense);
 
     res.status(200).json({ expense });
@@ -310,7 +269,6 @@ exports.getExpenseById = async (req, res) => {
   }
 };
 
-// Helper function to fetch payment history
 const fetchPaymentHistory = async (expense) => {
   const paymentIntentId = expense.paymentIntentId;
   if (!paymentIntentId) return [];
@@ -321,25 +279,15 @@ const fetchPaymentHistory = async (expense) => {
   return charges.map((charge) => ({
     participantName: charge.billing_details.name || "Unknown",
     status: charge.status,
-    amountPaid: charge.amount / 100, // Convert from cents to currency units
+    amountPaid: charge.amount / 100,
     date: new Date(charge.created * 1000),
   }));
 };
-
-
-// controllers/expenseController.js
-
-// controllers/expenseController.js
-
-// controllers/expenseController.js
-
-
 
 exports.storeData = async (req, res, wallet, provider) => {
   try {
     const data = req.body;
 
-    // Pin data to IPFS using Pinata
     const response = await axios.post(
       'https://api.pinata.cloud/pinning/pinJSONToIPFS',
       {
@@ -357,14 +305,11 @@ exports.storeData = async (req, res, wallet, provider) => {
     const ipfsHash = response.data.IpfsHash;
     console.log('Data pinned to IPFS with hash:', ipfsHash);
 
-    // Interact with Ethereum blockchain
-    // Replace with your smart contract ABI and address
-    const contractABI = [/* Your Contract ABI */];
+    const contractABI = [];
     const contractAddress = 'YOUR_CONTRACT_ADDRESS';
 
     const contract = new ethers.Contract(contractAddress, contractABI, wallet);
 
-    // Assume your contract has a function to store the IPFS hash
     const tx = await contract.storeExpense(ipfsHash);
     await tx.wait();
     console.log('Data stored on blockchain with transaction hash:', tx.hash);
